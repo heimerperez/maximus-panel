@@ -96,6 +96,27 @@ a.enl:hover{text-decoration:underline}
 .venc-alerta{background:var(--rojo-suave);border-left:4px solid var(--rojo)}
 .venc-pronto{background:var(--alerta-suave);border-left:4px solid var(--alerta)}
 
+/* filas expandibles de casos */
+.tabla-casos .fila-caso{cursor:pointer;transition:background .12s}
+.tabla-casos .fila-caso:hover{background:#F4F7FA}
+.tabla-casos .fila-caso.abierta{background:var(--sello-suave)}
+.tabla-casos .fila-caso.abierta td{border-bottom-color:transparent}
+.tabla-casos .chev{color:var(--sello);font-size:13px;text-align:center;user-select:none}
+.tabla-casos tr.detalle>td{padding:0;background:#F8FAFB;border-bottom:2px solid var(--sello)}
+.det{padding:16px 18px 18px}
+.det-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 22px;margin-bottom:6px}
+.dato{display:flex;flex-direction:column;gap:1px;padding:5px 0;border-bottom:1px dotted var(--linea)}
+.dato .etq{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--tinta2);font-weight:700}
+.dato .val{font-size:13px;font-weight:500}
+.det-bloque{margin-top:12px;background:var(--papel);border:1px solid var(--linea);border-radius:6px;padding:10px 12px}
+.det-bloque h4{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--tinta2);margin-bottom:5px}
+.det-bloque p{font-size:13px;line-height:1.45}
+.hist{margin:0;padding-left:18px;font-size:12px;line-height:1.5;color:var(--tinta2)}
+.det-seccion{margin-top:14px;padding-top:12px;border-top:1px solid var(--linea)}
+.det-seccion h4{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--tinta2);margin-bottom:8px;font-weight:700}
+.det-seccion .acciones{gap:6px}
+.det-seccion a.btn{text-decoration:none;display:inline-flex;align-items:center}
+
 /* modales */
 #velo{position:fixed;inset:0;background:rgba(24,36,48,.55);display:none;align-items:flex-start;justify-content:center;padding:30px 14px;z-index:50;overflow:auto}
 #velo.abierto{display:flex}
@@ -111,7 +132,9 @@ a.enl:hover{text-decoration:underline}
 .grafico{max-width:560px;margin:6px 0 18px}
 #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--tinta);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;display:none;z-index:99;box-shadow:var(--sombra)}
 @media(max-width:760px){
-  .tabla th:nth-child(3),.tabla td:nth-child(3){display:none}
+  .tabla-casos th:nth-child(4),.tabla-casos td:nth-child(4),
+  .tabla-casos th:nth-child(7),.tabla-casos td:nth-child(7){display:none}
+  .det-grid{grid-template-columns:1fr}
   main{padding:10px} header .sub{display:none}
 }
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
@@ -186,10 +209,12 @@ a.enl:hover{text-decoration:underline}
   </div>
   <div class="panel scroll">
     <div id="resumenFiltro" style="font-size:12px;color:var(--tinta2);margin-bottom:8px"></div>
-    <table class="tabla" id="tablaCasos">
+    <table class="tabla tabla-casos" id="tablaCasos">
       <thead><tr>
+        <th style="width:26px"></th>
         <th>Radicado</th><th>Peticionario / Accionante</th><th>Comparendo</th>
-        <th>Fecha</th><th>Notif. ORDEN</th><th>Estado</th><th>Resultado</th><th>Acciones</th>
+        <th>Fecha</th><th>Estado</th><th>Resultado</th>
+        <th>Notif. respuesta</th><th>Constancia</th>
       </tr></thead><tbody></tbody>
     </table>
   </div>
@@ -447,49 +472,116 @@ function limpiarFiltros(){
     document.getElementById(i).value=""});
   pintarCasos();
 }
+var casoAbierto=null;
 function pintarCasos(){
   var lista=filtrarCasos();
   lista.sort(function(a,b){return (b.fecha_registro||"").localeCompare(a.fecha_registro||"")});
   document.getElementById("resumenFiltro").textContent=
     (expedienteActivo?"EXPEDIENTE COMPLETO · ":"")+lista.length+" actuaciones";
   var tb=document.querySelector("#tablaCasos tbody");
+  if(!lista.length){
+    tb.innerHTML="<tr><td colspan=9 style='color:var(--tinta2);padding:24px'>Sin casos para los filtros actuales. Ajuste la búsqueda o registre un lote.</td></tr>";
+    return;
+  }
   tb.innerHTML=lista.map(function(c){
     var dupTag=c.estado_duplicado==="POSIBLE_DUPLICADO"||c.estado_duplicado==="DUPLICADO_CONFIRMADO"
       ?' <span class="dup">'+c.estado_duplicado.replace("_"," ")+'</span>'
       :(c.estado_duplicado==="REITERACION"?' <span class="reit">REITERACIÓN</span>':"");
     var notaTag=c.notas?' <span class="notaTag">notas</span>':"";
-    var esPet=c.tipo_actuacion.indexOf("PETICION")===0;
-    var acc=[];
-    if(c.enlace_drive_principal)acc.push('<a class="enl" target="_blank" href="'+esc(c.enlace_drive_principal)+'">Word</a>');
-    if(c.enlace_drive_pdf)acc.push('<a class="enl" target="_blank" href="'+esc(c.enlace_drive_pdf)+'">PDF</a>');
-    if(c.enlace_drive_carpeta)acc.push('<a class="enl" target="_blank" href="'+esc(c.enlace_drive_carpeta)+'">Carpeta</a>');
-    if(c.enlace_constancia)acc.push('<a class="enl" target="_blank" href="'+esc(c.enlace_constancia)+'">Constancia</a>');
-    if(c.enlace_gmail)acc.push('<a class="enl" target="_blank" href="'+esc(c.enlace_gmail)+'">Abrir en Gmail</a>');
-    acc.push('<button class="btn mini" onclick="verNotas(\''+c.id_caso+'\')">Notas</button>');
-    acc.push('<button class="btn mini" onclick="verExpedienteModal(\''+c.id_caso+'\')">Expediente</button>');
-    acc.push('<select class="btn mini" onchange="cambiarEstado(\''+c.id_caso+'\',this.value);this.value=\'\'">'+
-      '<option value="">Estado…</option><option>PROYECTADO</option><option>REVISADO</option>'+
-      '<option>NOTIFICADO</option><option>ERROR</option></select>');
-    if(esPet&&(c.estado_proceso==="REVISADO"||c.estado_proceso==="NOTIFICADO"))
-      acc.push('<button class="btn mini" onclick="modalRenotificar(\''+c.id_caso+'\')">Nueva notificación</button>');
-    if(c.tipo_actuacion==="TUTELA"){
-      var rel=peticionRelacionada(c);
-      var lista_ok=rel&&rel.estado_proceso==="NOTIFICADO";
-      acc.push('<button class="btn mini" '+(lista_ok?"":'disabled title="Petición relacionada sin notificar"')+
-        ' onclick="descargarPaquete(\''+c.id_caso+'\')">Paquete tutela</button>');
-    }
-    if(c.hash_pdf_enviado)
-      acc.push('<button class="btn mini" onclick="verificarHash(\''+c.id_caso+'\')">Verificar hash</button>');
-    return "<tr><td>"+rad(c.id_caso)+dupTag+notaTag+"</td>"+
+    var abierta=casoAbierto===c.id_caso;
+    var fNotif=(c.fecha_notificacion_correo||"").slice(0,16)||"—";
+    var constancia=c.enlace_constancia
+      ?'<a class="enl" target="_blank" href="'+esc(c.enlace_constancia)+'" onclick="event.stopPropagation()">Descargar</a>'
+      :"<span style='color:var(--tinta2)'>—</span>";
+    var fila="<tr class='fila-caso"+(abierta?" abierta":"")+"' onclick=\"toggleCaso('"+c.id_caso+"')\">"+
+      "<td class='chev'>"+(abierta?"▾":"▸")+"</td>"+
+      "<td>"+rad(c.id_caso)+dupTag+notaTag+"</td>"+
       "<td><b>"+esc(c.accionante_peticionario)+"</b><br><small style='color:var(--tinta2)'>"+
       esc(TIPO_TXT[c.tipo_actuacion]||c.tipo_actuacion)+(c.lote?" · "+esc(c.lote):"")+"</small></td>"+
       "<td class='mono'>"+esc(c.comparendo||"—")+"</td>"+
       "<td>"+esc((c.fecha_registro||"").slice(0,10))+"</td>"+
-      "<td>"+esc(c.estado_notificacion_orden||"—")+"</td>"+
       "<td><span class='estado "+c.estado_proceso+"'>"+esc(c.estado_proceso)+"</span></td>"+
       "<td>"+esc(c.resultado||"—")+"</td>"+
-      "<td><div class='acciones'>"+acc.join("")+"</div></td></tr>";
-  }).join("")||"<tr><td colspan=8 style='color:var(--tinta2);padding:24px'>Sin casos para los filtros actuales. Ajuste la búsqueda o registre un lote.</td></tr>";
+      "<td class='mono' style='font-size:11.5px'>"+esc(fNotif)+"</td>"+
+      "<td>"+constancia+"</td></tr>";
+    if(abierta) fila+="<tr class='detalle'><td colspan=9>"+detalleCaso(c)+"</td></tr>";
+    return fila;
+  }).join("");
+}
+function toggleCaso(id){
+  casoAbierto = (casoAbierto===id) ? null : id;
+  pintarCasos();
+}
+function campo(etq,val,mono){
+  return "<div class='dato'><span class='etq'>"+etq+"</span><span class='val"+(mono?" mono":"")+"'>"+
+    (val?esc(val):"<i style='color:var(--tinta2)'>—</i>")+"</span></div>";
+}
+function detalleCaso(c){
+  var esPet=c.tipo_actuacion.indexOf("PETICION")===0;
+  // --- Bloque de datos ---
+  var datos="<div class='det-grid'>"+
+    campo("Peticionario / Accionante",c.accionante_peticionario)+
+    campo("Tipo de actuación",TIPO_TXT[c.tipo_actuacion]||c.tipo_actuacion)+
+    campo("Comparendo",c.comparendo,true)+campo("Placa",c.placa,true)+
+    campo("Fecha de registro",(c.fecha_registro||"").slice(0,16),true)+
+    campo("Fecha de radicación",c.fecha_radicacion,true)+
+    campo("Lote",c.lote)+campo("Estado",c.estado_proceso)+
+    campo("Resultado",c.resultado)+
+    campo("Notificación de la ORDEN",c.estado_notificacion_orden)+
+    campo("Estado de duplicado",c.estado_duplicado)+
+    campo("Correo de notificación",c.correo_notificacion,true)+
+    (c.id_caso_relacionado?campo("Expediente relacionado",c.id_caso_relacionado,true):"")+
+    (c.juzgado?campo("Juzgado",c.juzgado):"")+
+    (c.fecha_vencimiento?campo("Vence (término)",(c.fecha_vencimiento||"").slice(0,10),true):"")+
+    campo("Notificación de la respuesta",(c.fecha_notificacion_correo||"").slice(0,16),true)+
+    "</div>";
+  // --- Peticiones y observaciones ---
+  var textos="";
+  if(c.resumen_peticiones) textos+="<div class='det-bloque'><h4>Peticiones</h4><p>"+esc(c.resumen_peticiones)+"</p></div>";
+  if(c.observaciones) textos+="<div class='det-bloque'><h4>Observaciones</h4><p>"+esc(c.observaciones)+"</p></div>";
+  if(c.notas) textos+="<div class='det-bloque'><h4>Notas</h4><p style='white-space:pre-wrap'>"+esc(c.notas)+"</p></div>";
+  if(c.historial_notificaciones){
+    var h=c.historial_notificaciones.split("|").filter(Boolean).map(function(n){
+      return "<li>"+esc(n.trim())+"</li>"}).join("");
+    textos+="<div class='det-bloque'><h4>Historial de notificaciones</h4><ul class='hist'>"+h+"</ul></div>";
+  }
+  // --- Documentos y enlaces ---
+  var docs=[];
+  if(c.enlace_drive_principal)docs.push('<a class="btn mini" target="_blank" href="'+esc(c.enlace_drive_principal)+'">📄 Word</a>');
+  if(c.enlace_drive_pdf)docs.push('<a class="btn mini" target="_blank" href="'+esc(c.enlace_drive_pdf)+'">📕 PDF</a>');
+  if(c.enlace_drive_carpeta)docs.push('<a class="btn mini" target="_blank" href="'+esc(c.enlace_drive_carpeta)+'">📁 Carpeta</a>');
+  if(c.enlace_constancia)docs.push('<a class="btn mini" target="_blank" href="'+esc(c.enlace_constancia)+'">🧾 Constancia</a>');
+  if(c.enlace_gmail)docs.push('<a class="btn mini" target="_blank" href="'+esc(c.enlace_gmail)+'">✉️ Abrir en Gmail</a>');
+  // --- Acciones ---
+  var acc=[];
+  acc.push('<button class="btn mini" onclick="verNotas(\''+c.id_caso+'\')">Agregar / ver notas</button>');
+  acc.push('<button class="btn mini" onclick="verExpedienteModal(\''+c.id_caso+'\')">Ver expediente</button>');
+  acc.push('<select class="btn mini" onchange="cambiarEstado(\''+c.id_caso+'\',this.value);this.value=\'\'">'+
+    '<option value="">Cambiar estado…</option><option>PROYECTADO</option><option>REVISADO</option>'+
+    '<option>NOTIFICADO</option><option>ERROR</option></select>');
+  if(esPet&&(c.estado_proceso==="REVISADO"||c.estado_proceso==="NOTIFICADO"))
+    acc.push('<button class="btn mini" onclick="modalRenotificar(\''+c.id_caso+'\')">Nueva notificación</button>');
+  if(c.tipo_actuacion==="TUTELA"){
+    var rel=peticionRelacionada(c);
+    var lista_ok=rel&&rel.estado_proceso==="NOTIFICADO";
+    acc.push('<button class="btn mini" '+(lista_ok?"":'disabled title="Petición relacionada sin notificar"')+
+      ' onclick="descargarPaquete(\''+c.id_caso+'\')">Paquete tutela</button>');
+  }
+  if(c.hash_pdf_enviado)
+    acc.push('<button class="btn mini" onclick="verificarHash(\''+c.id_caso+'\')">Verificar integridad (hash)</button>');
+  if(c.estado_duplicado==="POSIBLE_DUPLICADO"){
+    acc.push('<button class="btn mini peligro" onclick="resolverDup(\''+c.id_caso+'\',\'DUPLICADO_CONFIRMADO\')">Confirmar duplicado</button>');
+    acc.push('<button class="btn mini" onclick="resolverDup(\''+c.id_caso+'\',\'REITERACION\')">Es reiteración</button>');
+    acc.push('<button class="btn mini" onclick="resolverDup(\''+c.id_caso+'\',\'NUEVO\')">Es caso nuevo</button>');
+  }
+  return "<div class='det' onclick='event.stopPropagation()'>"+
+    "<div class='det-cols'>"+
+      "<div class='det-col-main'>"+datos+textos+"</div>"+
+    "</div>"+
+    "<div class='det-seccion'><h4>Documentos</h4><div class='acciones'>"+
+      (docs.length?docs.join(""):"<span style='color:var(--tinta2);font-size:12px'>Aún no hay documentos subidos a Drive.</span>")+"</div></div>"+
+    "<div class='det-seccion'><h4>Acciones</h4><div class='acciones'>"+acc.join("")+"</div></div>"+
+    "</div>";
 }
 function peticionRelacionada(tut){
   var rel=null;
