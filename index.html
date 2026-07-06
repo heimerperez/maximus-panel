@@ -116,6 +116,12 @@ a.enl:hover{text-decoration:underline}
 .det-seccion h4{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--tinta2);margin-bottom:8px;font-weight:700}
 .det-seccion .acciones{gap:6px}
 .det-seccion a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.qa-seccion{background:#F3F8FF;border:1px solid #CFE0F5;border-radius:8px;padding:12px;margin-top:14px}
+.qa-estado{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.qa-estado .etq{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--tinta2);font-weight:700}
+.qa-motivo{width:100%;font-size:12px;background:var(--rojo-suave);color:var(--rojo);border-radius:5px;padding:5px 8px;margin-top:4px}
+.sesion-info{color:#9FB0C0;font-size:11.5px;font-weight:600;margin-right:4px;white-space:nowrap}
+.btn.mini.primario{background:var(--sello);border-color:var(--sello);color:#fff}
 
 /* modales */
 #velo{position:fixed;inset:0;background:rgba(24,36,48,.55);display:none;align-items:flex-start;justify-content:center;padding:30px 14px;z-index:50;overflow:auto}
@@ -147,10 +153,12 @@ a.enl:hover{text-decoration:underline}
   <div class="caja">
     <span class="marca">MAXIMUS · CONTROL</span>
     <h1>Panel de seguimiento de actuaciones</h1>
-    <p>Secretaría de Gobierno, Seguridad y Convivencia Ciudadana con Funciones de Tránsito y Transporte del Municipio de Obando, Valle del Cauca. Acceso exclusivo del administrador.</p>
-    <input type="password" id="clave" placeholder="Contraseña de administrador" autocomplete="current-password">
+    <p>Secretaría de Gobierno, Seguridad y Convivencia Ciudadana con Funciones de Tránsito y Transporte del Municipio de Obando, Valle del Cauca.</p>
+    <input type="text" id="usuario" placeholder="Usuario (admin o su nombre de revisor)" autocomplete="username" autocapitalize="none">
+    <input type="password" id="clave" placeholder="Contraseña" autocomplete="current-password">
     <button class="entrar" onclick="entrar()">Entrar</button>
     <div class="error" id="loginError"></div>
+    <p style="font-size:11px;margin-top:12px;margin-bottom:0">El administrador ingresa con usuario <b>admin</b>. Los revisores usan el usuario que se les asignó.</p>
   </div>
 </div>
 
@@ -162,6 +170,7 @@ a.enl:hover{text-decoration:underline}
     <div class="titulo">Control de actuaciones — Obando, Valle</div>
   </div>
   <div class="der">
+    <span id="sesionInfo" class="sesion-info"></span>
     <button class="btn" onclick="cargar(true)">Actualizar</button>
     <button class="btn" onclick="salir()">Cerrar sesión</button>
   </div>
@@ -170,11 +179,13 @@ a.enl:hover{text-decoration:underline}
 
 <nav>
   <button data-t="casos" class="activo" onclick="tab('casos')">Casos</button>
+  <button data-t="calidad" onclick="tab('calidad')">Control de calidad <span class="pill" id="pillCalidad" style="display:none"></span></button>
   <button data-t="venc" onclick="tab('venc')">Vencimientos <span class="pill" id="pillVenc" style="display:none"></span></button>
   <button data-t="conso" onclick="tab('conso')">Consolidado</button>
   <button data-t="rep" onclick="tab('rep')">Reportes</button>
-  <button data-t="apro" onclick="tab('apro')">Aprobaciones <span class="pill" id="pillApro" style="display:none"></span></button>
-  <button data-t="aud" onclick="tab('aud')">Auditoría</button>
+  <button data-t="apro" class="solo-admin" onclick="tab('apro')">Aprobaciones <span class="pill" id="pillApro" style="display:none"></span></button>
+  <button data-t="usuarios" class="solo-admin" onclick="tab('usuarios')">Usuarios</button>
+  <button data-t="aud" class="solo-admin" onclick="tab('aud')">Auditoría</button>
 </nav>
 
 <main>
@@ -305,7 +316,57 @@ a.enl:hover{text-decoration:underline}
       <button class="btn" onclick="expAuditoria()">Exportar Excel</button>
     </div>
     <table class="tabla" id="tablaAud"><thead><tr>
-      <th>Fecha y hora</th><th>Acción</th><th>Afectado</th><th>Anterior</th><th>Nuevo</th><th>Detalle</th>
+      <th>Fecha y hora</th><th>Usuario</th><th>Acción</th><th>Afectado</th><th>Anterior</th><th>Nuevo</th><th>Detalle</th>
+    </tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<!-- ---------- CONTROL DE CALIDAD ---------- -->
+<section id="t-calidad" style="display:none">
+  <div class="panel">
+    <h2>Control de calidad</h2>
+    <p style="font-size:12.5px;color:var(--tinta2);margin-bottom:10px">Revise cada contestación abriendo su Word y PDF, y marque el veredicto. Al aprobar, el caso queda señalado como listo para que el administrador apruebe el envío. Al devolver, indique el motivo para corrección.</p>
+    <div class="filtros">
+      <label>Ver
+        <select id="fCalidad" onchange="pintarCalidad()">
+          <option value="PENDIENTE">Pendientes de revisar</option>
+          <option value="APROBADO_QA">Aprobados por calidad</option>
+          <option value="DEVUELTO">Devueltos</option>
+          <option value="TODOS">Todos</option>
+        </select>
+      </label>
+      <label>Buscar<input id="fCalidadBuscar" oninput="pintarCalidad()" placeholder="nombre, comparendo, id"></label>
+    </div>
+  </div>
+  <div class="panel scroll">
+    <div id="resumenCalidad" style="font-size:12px;color:var(--tinta2);margin-bottom:8px"></div>
+    <table class="tabla tabla-casos" id="tablaCalidad"><thead><tr>
+      <th style="width:26px"></th>
+      <th>Radicado</th><th>Peticionario</th><th>Tipo</th><th>Estado</th>
+      <th>Calidad</th><th>Revisor</th>
+    </tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<!-- ---------- USUARIOS (solo admin) ---------- -->
+<section id="t-usuarios" style="display:none">
+  <div class="panel">
+    <h2>Usuarios del panel</h2>
+    <p style="font-size:12.5px;color:var(--tinta2);margin-bottom:12px">Los revisores pueden ver los casos, abrir documentos, dejar notas y marcar el veredicto de calidad. No pueden aprobar ni despachar correos, ni resolver duplicados, ni gestionar usuarios.</p>
+    <div class="filtros" style="align-items:end">
+      <label>Usuario<input id="nuUsuario" placeholder="ej.: laura.gomez" autocapitalize="none"></label>
+      <label>Nombre completo<input id="nuNombre" placeholder="Laura Gómez" style="min-width:180px"></label>
+      <label>Contraseña<input id="nuClave" type="text" placeholder="mínimo 6 caracteres"></label>
+      <label>Rol
+        <select id="nuRol"><option value="revisor">Revisor (control de calidad)</option>
+        <option value="admin">Administrador</option></select>
+      </label>
+      <button class="btn primario" onclick="crearUsuario()">Crear usuario</button>
+    </div>
+  </div>
+  <div class="panel scroll">
+    <table class="tabla" id="tablaUsuarios"><thead><tr>
+      <th>Usuario</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Creado</th><th>Acciones</th>
     </tr></thead><tbody></tbody></table>
   </div>
 </section>
@@ -345,29 +406,50 @@ async function api(action, extra){
 }
 
 /* ------------ sesión ------------ */
+var ROL = sessionStorage.getItem("mx_rol") || "";
+var NOMBRE = sessionStorage.getItem("mx_nombre") || "";
 async function entrar(){
+  var usuario=document.getElementById("usuario").value.trim();
   var clave=document.getElementById("clave").value, err=document.getElementById("loginError");
   err.textContent="Validando...";
   try{
     var r=await fetch(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
-      body:JSON.stringify({action:"login",clave:clave})});
+      body:JSON.stringify({action:"login",usuario:usuario,clave:clave})});
     var j=await r.json();
     if(!j.ok){err.textContent=j.error;return}
-    TOKEN=j.token; sessionStorage.setItem("mx_token",TOKEN);
+    TOKEN=j.token; ROL=j.rol; NOMBRE=j.nombre||usuario;
+    sessionStorage.setItem("mx_token",TOKEN);
+    sessionStorage.setItem("mx_rol",ROL);
+    sessionStorage.setItem("mx_nombre",NOMBRE);
     document.getElementById("login").style.display="none";
     document.getElementById("app").style.display="block";
-    err.textContent=""; cargar(true);
+    err.textContent=""; aplicarRol(); cargar(true);
   }catch(e){err.textContent="No fue posible conectar con el servidor. Verifique la URL del Apps Script."}
 }
 function salir(silencioso){
   if(TOKEN && !silencioso) api("logout").catch(function(){});
-  TOKEN=""; sessionStorage.removeItem("mx_token");
+  TOKEN="";ROL="";NOMBRE="";
+  sessionStorage.removeItem("mx_token");sessionStorage.removeItem("mx_rol");sessionStorage.removeItem("mx_nombre");
   document.getElementById("app").style.display="none";
   document.getElementById("login").style.display="flex";
   document.getElementById("clave").value="";
   if(silencioso) document.getElementById("loginError").textContent="La sesión venció. Ingrese de nuevo.";
 }
+function aplicarRol(){
+  var esAdmin = ROL==="admin";
+  document.querySelectorAll(".solo-admin").forEach(function(el){
+    el.style.display = esAdmin ? "" : "none";
+  });
+  var info=document.getElementById("sesionInfo");
+  if(info) info.textContent = (NOMBRE||"")+" · "+(esAdmin?"Administrador":"Revisor");
+  // si un revisor estaba en una pestaña de admin, llevarlo a casos
+  if(!esAdmin){
+    var actual=document.querySelector("nav button.activo");
+    if(actual && actual.classList.contains("solo-admin")) tab("casos");
+  }
+}
 document.getElementById("clave").addEventListener("keydown",function(e){if(e.key==="Enter")entrar()});
+document.getElementById("usuario").addEventListener("keydown",function(e){if(e.key==="Enter")document.getElementById("clave").focus()});
 
 /* ------------ datos ------------ */
 async function cargar(manual){
@@ -376,23 +458,28 @@ async function cargar(manual){
     var j=await api("getDatos");
     if(!j.ok){toast(j.error);return}
     CASOS=j.casos||[]; CORREOS=j.correos||[];
-    poblarLotes(); pintarCasos(); pintarVenc(); pintarConsolidado(); pintarAprobaciones();
+    if(j.rol){ROL=j.rol;NOMBRE=j.nombre||NOMBRE;aplicarRol();}
+    poblarLotes(); pintarCasos(); pintarCalidad(); pintarVenc(); pintarConsolidado();
+    if(ROL==="admin") pintarAprobaciones();
     if(manual)toast("Datos actualizados");
   }catch(e){ if(manual)toast("Error al cargar: "+e.message) }
 }
 setInterval(function(){cargar(false)},60000);
 if(TOKEN){document.getElementById("login").style.display="none";
-  document.getElementById("app").style.display="block";cargar(true);}
+  document.getElementById("app").style.display="block";aplicarRol();cargar(true);}
 
 function tab(t){
-  ["casos","venc","conso","rep","apro","aud"].forEach(function(x){
-    document.getElementById("t-"+x).style.display = x===t?"block":"none";
+  ["casos","calidad","venc","conso","rep","apro","usuarios","aud"].forEach(function(x){
+    var el=document.getElementById("t-"+x);
+    if(el) el.style.display = x===t?"block":"none";
   });
   document.querySelectorAll("nav button").forEach(function(b){
     b.classList.toggle("activo",b.dataset.t===t);
   });
   if(t==="aud"&&!AUD.length)cargarAuditoria();
   if(t==="conso")pintarConsolidado();
+  if(t==="usuarios")cargarUsuarios();
+  if(t==="calidad")pintarCalidad();
 }
 
 /* ------------ utilidades ------------ */
@@ -552,36 +639,56 @@ function detalleCaso(c){
   if(c.enlace_drive_carpeta)docs.push('<a class="btn mini" target="_blank" href="'+esc(c.enlace_drive_carpeta)+'">📁 Carpeta</a>');
   if(c.enlace_constancia)docs.push('<a class="btn mini" target="_blank" href="'+esc(c.enlace_constancia)+'">🧾 Constancia</a>');
   if(c.enlace_gmail)docs.push('<a class="btn mini" target="_blank" href="'+esc(c.enlace_gmail)+'">✉️ Abrir en Gmail</a>');
-  // --- Acciones ---
+  // --- Acciones comunes (revisor y admin) ---
   var acc=[];
   acc.push('<button class="btn mini" onclick="verNotas(\''+c.id_caso+'\')">Agregar / ver notas</button>');
   acc.push('<button class="btn mini" onclick="verExpedienteModal(\''+c.id_caso+'\')">Ver expediente</button>');
   acc.push('<select class="btn mini" onchange="cambiarEstado(\''+c.id_caso+'\',this.value);this.value=\'\'">'+
     '<option value="">Cambiar estado…</option><option>PROYECTADO</option><option>REVISADO</option>'+
-    '<option>NOTIFICADO</option><option>ERROR</option></select>');
+    (ROL==="admin"?'<option>NOTIFICADO</option>':'')+'<option>ERROR</option></select>');
+  if(c.hash_pdf_enviado)
+    acc.push('<button class="btn mini" onclick="verificarHash(\''+c.id_caso+'\')">Verificar integridad (hash)</button>');
+  // --- Acciones solo de administrador ---
+  var accAdmin=[];
   if(esPet&&(c.estado_proceso==="REVISADO"||c.estado_proceso==="NOTIFICADO"))
-    acc.push('<button class="btn mini" onclick="modalRenotificar(\''+c.id_caso+'\')">Nueva notificación</button>');
+    accAdmin.push('<button class="btn mini" onclick="modalRenotificar(\''+c.id_caso+'\')">Nueva notificación</button>');
   if(c.tipo_actuacion==="TUTELA"){
     var rel=peticionRelacionada(c);
     var lista_ok=rel&&rel.estado_proceso==="NOTIFICADO";
-    acc.push('<button class="btn mini" '+(lista_ok?"":'disabled title="Petición relacionada sin notificar"')+
+    accAdmin.push('<button class="btn mini" '+(lista_ok?"":'disabled title="Petición relacionada sin notificar"')+
       ' onclick="descargarPaquete(\''+c.id_caso+'\')">Paquete tutela</button>');
   }
-  if(c.hash_pdf_enviado)
-    acc.push('<button class="btn mini" onclick="verificarHash(\''+c.id_caso+'\')">Verificar integridad (hash)</button>');
   if(c.estado_duplicado==="POSIBLE_DUPLICADO"){
-    acc.push('<button class="btn mini peligro" onclick="resolverDup(\''+c.id_caso+'\',\'DUPLICADO_CONFIRMADO\')">Confirmar duplicado</button>');
-    acc.push('<button class="btn mini" onclick="resolverDup(\''+c.id_caso+'\',\'REITERACION\')">Es reiteración</button>');
-    acc.push('<button class="btn mini" onclick="resolverDup(\''+c.id_caso+'\',\'NUEVO\')">Es caso nuevo</button>');
+    accAdmin.push('<button class="btn mini peligro" onclick="resolverDup(\''+c.id_caso+'\',\'DUPLICADO_CONFIRMADO\')">Confirmar duplicado</button>');
+    accAdmin.push('<button class="btn mini" onclick="resolverDup(\''+c.id_caso+'\',\'REITERACION\')">Es reiteración</button>');
+    accAdmin.push('<button class="btn mini" onclick="resolverDup(\''+c.id_caso+'\',\'NUEVO\')">Es caso nuevo</button>');
   }
-  return "<div class='det' onclick='event.stopPropagation()'>"+
+  // --- Bloque de control de calidad ---
+  var qaEstado=c.calidad_estado||"PENDIENTE_QA";
+  var qaTxt={PENDIENTE_QA:"Pendiente de revisar",APROBADO_QA:"Aprobado por calidad",DEVUELTO:"Devuelto para corrección"};
+  var qaClase={PENDIENTE_QA:"PROYECTADO",APROBADO_QA:"NOTIFICADO",DEVUELTO:"ERROR"};
+  var qaInfo="<div class='qa-estado'><span class='etq'>Estado de calidad</span>"+
+    "<span class='estado "+(qaClase[qaEstado]||"PROYECTADO")+"'>"+(qaTxt[qaEstado]||qaEstado)+"</span>"+
+    (c.calidad_revisor?" <small style='color:var(--tinta2)'>por "+esc(c.calidad_revisor)+
+      (c.calidad_fecha?" · "+esc((c.calidad_fecha||"").slice(0,16)):"")+"</small>":"")+
+    (c.calidad_motivo?"<div class='qa-motivo'>Motivo de devolución: "+esc(c.calidad_motivo)+"</div>":"")+"</div>";
+  var qaBtns="<button class='btn mini primario' onclick=\"marcarCalidad('"+c.id_caso+"','APROBADO_QA')\">✓ Aprobar calidad</button>"+
+    "<button class='btn mini peligro' onclick=\"marcarCalidad('"+c.id_caso+"','DEVUELTO')\">✗ Devolver</button>"+
+    (qaEstado!=="PENDIENTE_QA"?"<button class='btn mini' onclick=\"marcarCalidad('"+c.id_caso+"','PENDIENTE_QA')\">Reabrir revisión</button>":"");
+
+  var html="<div class='det' onclick='event.stopPropagation()'>"+
     "<div class='det-cols'>"+
       "<div class='det-col-main'>"+datos+textos+"</div>"+
     "</div>"+
     "<div class='det-seccion'><h4>Documentos</h4><div class='acciones'>"+
       (docs.length?docs.join(""):"<span style='color:var(--tinta2);font-size:12px'>Aún no hay documentos subidos a Drive.</span>")+"</div></div>"+
-    "<div class='det-seccion'><h4>Acciones</h4><div class='acciones'>"+acc.join("")+"</div></div>"+
-    "</div>";
+    "<div class='det-seccion qa-seccion'><h4>Control de calidad</h4>"+qaInfo+
+      "<div class='acciones' style='margin-top:8px'>"+qaBtns+"</div></div>"+
+    "<div class='det-seccion'><h4>Acciones</h4><div class='acciones'>"+acc.join("")+"</div></div>";
+  if(ROL==="admin" && accAdmin.length)
+    html+="<div class='det-seccion'><h4>Acciones del administrador</h4><div class='acciones'>"+accAdmin.join("")+"</div></div>";
+  html+="</div>";
+  return html;
 }
 function peticionRelacionada(tut){
   var rel=null;
@@ -596,6 +703,105 @@ async function cambiarEstado(id,estado){
   var j=await api("setEstado",{id_caso:id,estado:estado});
   toast(j.ok?"Estado actualizado a "+estado:j.error); cargar(false);
 }
+
+/* ------------ CONTROL DE CALIDAD ------------ */
+async function marcarCalidad(id,veredicto){
+  var motivo="";
+  if(veredicto==="DEVUELTO"){
+    motivo=prompt("Motivo de la devolución (qué debe corregirse):","");
+    if(motivo===null)return;
+  }
+  var j=await api("marcarCalidad",{id_caso:id,veredicto:veredicto,motivo:motivo});
+  toast(j.ok?"Veredicto registrado":j.error); cargar(false);
+}
+function pintarCalidad(){
+  var sec=document.getElementById("t-calidad");
+  if(!sec) return;
+  var modo=document.getElementById("fCalidad").value;
+  var q=norm(document.getElementById("fCalidadBuscar").value);
+  var lista=CASOS.filter(function(c){
+    var qa=c.calidad_estado||"PENDIENTE_QA";
+    if(modo==="PENDIENTE"&&qa!=="PENDIENTE_QA")return false;
+    if(modo==="APROBADO_QA"&&qa!=="APROBADO_QA")return false;
+    if(modo==="DEVUELTO"&&qa!=="DEVUELTO")return false;
+    if(q){
+      var blob=norm([c.id_caso,c.accionante_peticionario,c.comparendo].join(" "));
+      if(blob.indexOf(q)<0)return false;
+    }
+    return true;
+  });
+  lista.sort(function(a,b){return (b.fecha_registro||"").localeCompare(a.fecha_registro||"")});
+  var pend=CASOS.filter(function(c){return (c.calidad_estado||"PENDIENTE_QA")==="PENDIENTE_QA"}).length;
+  var pill=document.getElementById("pillCalidad");
+  if(pill){pill.style.display=pend?"inline":"none";pill.textContent=pend;}
+  var rc=document.getElementById("resumenCalidad");
+  if(rc) rc.textContent=lista.length+" casos · "+pend+" pendientes de revisar en total";
+  var qaTxt={PENDIENTE_QA:"Pendiente",APROBADO_QA:"Aprobado",DEVUELTO:"Devuelto"};
+  var qaClase={PENDIENTE_QA:"PROYECTADO",APROBADO_QA:"NOTIFICADO",DEVUELTO:"ERROR"};
+  var tb=document.querySelector("#tablaCalidad tbody");
+  if(!lista.length){tb.innerHTML="<tr><td colspan=7 style='color:var(--tinta2);padding:20px'>No hay casos para este filtro.</td></tr>";return}
+  tb.innerHTML=lista.map(function(c){
+    var abierta=casoAbierto===c.id_caso;
+    var qa=c.calidad_estado||"PENDIENTE_QA";
+    var fila="<tr class='fila-caso"+(abierta?" abierta":"")+"' onclick=\"toggleCaso('"+c.id_caso+"')\">"+
+      "<td class='chev'>"+(abierta?"▾":"▸")+"</td>"+
+      "<td>"+rad(c.id_caso)+"</td>"+
+      "<td><b>"+esc(c.accionante_peticionario)+"</b></td>"+
+      "<td><small>"+esc(TIPO_TXT[c.tipo_actuacion]||c.tipo_actuacion)+"</small></td>"+
+      "<td><span class='estado "+c.estado_proceso+"'>"+esc(c.estado_proceso)+"</span></td>"+
+      "<td><span class='estado "+(qaClase[qa]||"PROYECTADO")+"'>"+(qaTxt[qa]||qa)+"</span></td>"+
+      "<td><small>"+esc(c.calidad_revisor||"—")+"</small></td></tr>";
+    if(abierta) fila+="<tr class='detalle'><td colspan=7>"+detalleCaso(c)+"</td></tr>";
+    return fila;
+  }).join("");
+}
+
+/* ------------ USUARIOS ------------ */
+async function cargarUsuarios(){
+  if(ROL!=="admin")return;
+  var j=await api("listarUsuarios");
+  if(!j.ok){toast(j.error);return}
+  var tb=document.querySelector("#tablaUsuarios tbody");
+  tb.innerHTML=(j.usuarios||[]).map(function(u){
+    var activo=u.activo==="SI";
+    var acc="<button class='btn mini' onclick=\"resetClave('"+u.usuario+"')\">Cambiar contraseña</button>"+
+      (u.rol==="admin"&&u.usuario==="admin"?"":
+       "<button class='btn mini "+(activo?"peligro":"primario")+"' onclick=\"toggleUsuario('"+u.usuario+"',"+(!activo)+")\">"+
+       (activo?"Desactivar":"Activar")+"</button>");
+    return "<tr><td class='mono'>"+esc(u.usuario)+"</td><td>"+esc(u.nombre)+"</td>"+
+      "<td>"+(u.rol==="admin"?"Administrador":"Revisor")+"</td>"+
+      "<td><span class='estado "+(activo?"NOTIFICADO":"ERROR")+"'>"+(activo?"Activo":"Inactivo")+"</span></td>"+
+      "<td><small>"+esc((u.fecha_creacion||"").slice(0,10))+"</small></td>"+
+      "<td><div class='acciones'>"+acc+"</div></td></tr>";
+  }).join("")||"<tr><td colspan=6 style='color:var(--tinta2);padding:16px'>Aún no hay usuarios revisores. Cree el primero arriba.</td></tr>";
+}
+async function crearUsuario(){
+  var u=document.getElementById("nuUsuario").value.trim().toLowerCase();
+  var n=document.getElementById("nuNombre").value.trim();
+  var c=document.getElementById("nuClave").value;
+  var rol=document.getElementById("nuRol").value;
+  if(!u||!c){toast("Complete usuario y contraseña");return}
+  var j=await api("crearUsuario",{usuario_nuevo:u,nombre:n,clave_nueva:c,rol:rol});
+  if(j.ok){
+    toast("Usuario creado: "+u);
+    document.getElementById("nuUsuario").value="";
+    document.getElementById("nuNombre").value="";
+    document.getElementById("nuClave").value="";
+    cargarUsuarios();
+  }else toast(j.error);
+}
+async function resetClave(usuario){
+  var nueva=prompt("Nueva contraseña para "+usuario+" (mínimo 6 caracteres):","");
+  if(!nueva)return;
+  var j=await api("cambiarUsuario",{usuario_obj:usuario,cambios:{clave:nueva}});
+  toast(j.ok?"Contraseña actualizada":j.error);
+}
+async function toggleUsuario(usuario,activar){
+  var j=await api("cambiarUsuario",{usuario_obj:usuario,cambios:{activo:activar}});
+  toast(j.ok?(activar?"Usuario activado":"Usuario desactivado"):j.error);
+  cargarUsuarios();
+}
+
 async function verificarHash(id){
   toast("Verificando...");
   var j=await api("verificarHash",{id_caso:id});
@@ -807,9 +1013,10 @@ async function cargarAuditoria(){
 function pintarAuditoria(){
   var q=norm(document.getElementById("fAud").value);
   var filas=AUD.filter(function(a){
-    return !q||norm([a.accion,a.id_afectado,a.detalle,a.valor_nuevo].join(" ")).indexOf(q)>=0});
+    return !q||norm([a.usuario,a.accion,a.id_afectado,a.detalle,a.valor_nuevo].join(" ")).indexOf(q)>=0});
   document.querySelector("#tablaAud tbody").innerHTML=filas.slice().reverse().map(function(a){
-    return "<tr><td class='mono' style='white-space:nowrap'>"+esc(a.fecha_hora)+"</td><td><b>"+
+    return "<tr><td class='mono' style='white-space:nowrap'>"+esc(a.fecha_hora)+"</td><td>"+
+      esc(a.usuario||"—")+"</td><td><b>"+
       esc(a.accion)+"</b></td><td class='mono'>"+esc(a.id_afectado)+"</td><td>"+
       esc(a.valor_anterior)+"</td><td>"+esc(a.valor_nuevo)+"</td><td>"+esc(a.detalle)+"</td></tr>";
   }).join("");
