@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAXIMUS CONTROL — Secretaría de Tránsito de Obando</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{
+  --archivo:#EDF0F3; --papel:#FFFFFF; --tinta:#182430; --tinta2:#48586A;
+  --linea:#D5DCE3; --sello:#1E6B43; --sello-suave:#E4F1E9;
+  --alerta:#B07A1E; --alerta-suave:#F7EDD8; --rojo:#A8322D; --rojo-suave:#F6E3E2;
+  --azul:#2B5FA3; --azul-suave:#E3EBF6;
+  --pg:#3A7CA5; --pc:#16425B; --tu:#7A3E9D; --rr:#8A6D1D;
+  --radio:8px; --sombra:0 1px 3px rgba(24,36,48,.10),0 4px 14px rgba(24,36,48,.06);
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{font-family:'Libre Franklin',system-ui,sans-serif;background:var(--archivo);color:var(--tinta);font-size:14px}
+.mono{font-family:'IBM Plex Mono',monospace}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+input,select,textarea{font-family:inherit;font-size:13px;padding:7px 9px;border:1px solid var(--linea);border-radius:6px;background:var(--papel);color:var(--tinta)}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--azul);outline-offset:1px}
+
+/* ---------- Login ---------- */
+#login{position:fixed;inset:0;background:var(--tinta);display:flex;align-items:center;justify-content:center;padding:16px;z-index:100}
+#login .caja{background:var(--papel);border-radius:12px;padding:34px 30px;max-width:390px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+#login .marca{font-family:'IBM Plex Mono',monospace;font-weight:600;letter-spacing:.18em;font-size:12px;color:var(--sello);border:1.5px solid var(--sello);display:inline-block;padding:5px 10px;border-radius:4px;transform:rotate(-1.2deg)}
+#login h1{font-size:21px;font-weight:800;margin:16px 0 4px}
+#login p{color:var(--tinta2);font-size:12.5px;line-height:1.5;margin-bottom:18px}
+#login input{width:100%;padding:11px;font-size:15px;margin-bottom:10px}
+#login .entrar{width:100%;background:var(--tinta);color:#fff;padding:12px;border-radius:7px;font-weight:600;font-size:14px}
+#login .error{color:var(--rojo);font-size:12.5px;min-height:18px;margin-top:8px}
+
+/* ---------- App ---------- */
+#app{display:none;min-height:100%}
+header{background:var(--tinta);color:#fff;padding:12px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+header .sello{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.15em;border:1px solid rgba(255,255,255,.45);padding:3px 8px;border-radius:3px;color:#CFE7DA}
+header .titulo{font-weight:700;font-size:15px}
+header .sub{font-size:11px;color:#9FB0C0;width:100%;max-width:640px;line-height:1.35}
+header .der{margin-left:auto;display:flex;gap:8px;align-items:center}
+.btn{padding:7px 12px;border-radius:6px;font-weight:600;font-size:12.5px;border:1px solid var(--linea);background:var(--papel);color:var(--tinta)}
+.btn.primario{background:var(--sello);border-color:var(--sello);color:#fff}
+.btn.peligro{background:var(--rojo);border-color:var(--rojo);color:#fff}
+.btn.mini{padding:4px 8px;font-size:11.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+header .btn{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#fff}
+
+nav{display:flex;gap:2px;background:var(--papel);border-bottom:2px solid var(--linea);padding:0 12px;overflow-x:auto}
+nav button{padding:12px 14px;font-weight:600;font-size:13px;color:var(--tinta2);border-bottom:3px solid transparent;white-space:nowrap}
+nav button.activo{color:var(--tinta);border-bottom-color:var(--sello)}
+nav button .pill{background:var(--rojo);color:#fff;border-radius:9px;font-size:10.5px;padding:1px 6px;margin-left:4px}
+
+main{padding:16px;max-width:1340px;margin:0 auto}
+.panel{background:var(--papel);border-radius:var(--radio);box-shadow:var(--sombra);padding:16px;margin-bottom:16px}
+.filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
+.filtros label{display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:600;color:var(--tinta2)}
+h2{font-size:16px;font-weight:800;margin-bottom:12px}
+h3{font-size:13.5px;font-weight:700;margin:14px 0 8px}
+
+/* radicado chip — firma visual */
+.rad{font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;display:inline-flex;align-items:center;border:1px solid var(--linea);border-radius:4px;overflow:hidden;white-space:nowrap}
+.rad i{width:5px;align-self:stretch;display:block}
+.rad span{padding:3px 7px}
+.rad.PG i{background:var(--pg)} .rad.PC i{background:var(--pc)}
+.rad.TU i{background:var(--tu)} .rad.RR i{background:var(--rr)}
+
+.tabla{width:100%;border-collapse:collapse;font-size:12.5px}
+.tabla th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--tinta2);padding:8px 8px;border-bottom:2px solid var(--linea);white-space:nowrap}
+.tabla td{padding:8px;border-bottom:1px solid var(--linea);vertical-align:top}
+.scroll{overflow-x:auto}
+.estado{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.PROYECTADO{background:var(--alerta-suave);color:var(--alerta)}
+.REVISADO{background:var(--azul-suave);color:var(--azul)}
+.NOTIFICADO{background:var(--sello-suave);color:var(--sello)}
+.ERROR{background:var(--rojo-suave);color:var(--rojo)}
+.dup{background:var(--rojo-suave);color:var(--rojo);font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:4px}
+.reit{background:var(--alerta-suave);color:var(--alerta);font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:4px}
+.acciones{display:flex;gap:4px;flex-wrap:wrap}
+a.enl{color:var(--azul);font-weight:600;text-decoration:none;font-size:11.5px}
+a.enl:hover{text-decoration:underline}
+.notaTag{background:#FFF6D9;border:1px solid #E8D48A;border-radius:4px;font-size:10.5px;padding:1px 6px;font-weight:700;color:#7A621A}
+
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.kpi{background:var(--papel);border:1px solid var(--linea);border-radius:var(--radio);padding:12px}
+.kpi b{display:block;font-size:24px;font-weight:800}
+.kpi small{color:var(--tinta2);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.kpi .delta{font-size:11.5px;font-weight:700}
+.delta.up{color:var(--sello)} .delta.down{color:var(--rojo)}
+
+.venc-alerta{background:var(--rojo-suave);border-left:4px solid var(--rojo)}
+.venc-pronto{background:var(--alerta-suave);border-left:4px solid var(--alerta)}
+
+/* modales */
+#velo{position:fixed;inset:0;background:rgba(24,36,48,.55);display:none;align-items:flex-start;justify-content:center;padding:30px 14px;z-index:50;overflow:auto}
+#velo.abierto{display:flex}
+.modal{background:var(--papel);border-radius:10px;max-width:680px;width:100%;padding:20px;box-shadow:0 24px 70px rgba(0,0,0,.35)}
+.modal h2{display:flex;justify-content:space-between;align-items:center}
+.modal .cerrar{font-size:20px;color:var(--tinta2)}
+.timeline{border-left:2px solid var(--linea);margin-left:6px;padding-left:16px}
+.timeline .hito{position:relative;padding-bottom:14px}
+.timeline .hito::before{content:"";position:absolute;left:-21px;top:4px;width:8px;height:8px;border-radius:50%;background:var(--sello)}
+.correoPrev{border:1px solid var(--linea);border-radius:8px;padding:12px;margin-bottom:10px}
+.correoPrev .meta{font-size:12px;color:var(--tinta2);margin-bottom:6px}
+.correoPrev .cuerpo{border:1px dashed var(--linea);border-radius:6px;padding:10px;max-height:220px;overflow:auto;font-size:12.5px;background:#FBFCFD}
+.grafico{max-width:560px;margin:6px 0 18px}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--tinta);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;display:none;z-index:99;box-shadow:var(--sombra)}
+@media(max-width:760px){
+  .tabla th:nth-child(3),.tabla td:nth-child(3){display:none}
+  main{padding:10px} header .sub{display:none}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="login">
+  <div class="caja">
+    <span class="marca">MAXIMUS · CONTROL</span>
+    <h1>Panel de seguimiento de actuaciones</h1>
+    <p>Secretaría de Gobierno, Seguridad y Convivencia Ciudadana con Funciones de Tránsito y Transporte del Municipio de Obando, Valle del Cauca. Acceso exclusivo del administrador.</p>
+    <input type="password" id="clave" placeholder="Contraseña de administrador" autocomplete="current-password">
+    <button class="entrar" onclick="entrar()">Entrar</button>
+    <div class="error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app">
+<header>
+  <span class="sello">MAXIMUS</span>
+  <div>
+    <div class="titulo">Control de actuaciones — Obando, Valle</div>
+  </div>
+  <div class="der">
+    <button class="btn" onclick="cargar(true)">Actualizar</button>
+    <button class="btn" onclick="salir()">Cerrar sesión</button>
+  </div>
+  <div class="sub">Secretaría de Gobierno, Seguridad y Convivencia Ciudadana con Funciones de Tránsito y Transporte del Municipio de Obando, Valle del Cauca</div>
+</header>
+
+<nav>
+  <button data-t="casos" class="activo" onclick="tab('casos')">Casos</button>
+  <button data-t="venc" onclick="tab('venc')">Vencimientos <span class="pill" id="pillVenc" style="display:none"></span></button>
+  <button data-t="conso" onclick="tab('conso')">Consolidado</button>
+  <button data-t="rep" onclick="tab('rep')">Reportes</button>
+  <button data-t="apro" onclick="tab('apro')">Aprobaciones <span class="pill" id="pillApro" style="display:none"></span></button>
+  <button data-t="aud" onclick="tab('aud')">Auditoría</button>
+</nav>
+
+<main>
+<!-- ---------- CASOS ---------- -->
+<section id="t-casos">
+  <div class="panel">
+    <div class="filtros">
+      <label>Buscar (nombre, comparendo, id, notas)
+        <input id="fBuscar" style="min-width:230px" placeholder="Ej.: MARULANDA o 76497..." oninput="pintarCasos()">
+      </label>
+      <label>Desde<input type="date" id="fDesde" onchange="pintarCasos()"></label>
+      <label>Hasta<input type="date" id="fHasta" onchange="pintarCasos()"></label>
+      <label>Tipo
+        <select id="fTipo" onchange="pintarCasos()">
+          <option value="">Todos</option>
+          <option value="PETICION_GENERAL">Petición general</option>
+          <option value="PETICION_COMPARENDO">Petición con comparendo</option>
+          <option value="TUTELA">Tutela</option>
+          <option value="RECURSO_REPOSICION">Recurso reposición</option>
+        </select>
+      </label>
+      <label>Estado
+        <select id="fEstado" onchange="pintarCasos()">
+          <option value="">Todos</option><option>PROYECTADO</option>
+          <option>REVISADO</option><option>NOTIFICADO</option><option>ERROR</option>
+        </select>
+      </label>
+      <label>Lote<select id="fLote" onchange="pintarCasos()"><option value="">Todos</option></select></label>
+      <button class="btn" onclick="modoExpediente()">Ver expediente completo</button>
+      <button class="btn" onclick="limpiarFiltros()">Limpiar</button>
+    </div>
+  </div>
+  <div class="panel scroll">
+    <div id="resumenFiltro" style="font-size:12px;color:var(--tinta2);margin-bottom:8px"></div>
+    <table class="tabla" id="tablaCasos">
+      <thead><tr>
+        <th>Radicado</th><th>Peticionario / Accionante</th><th>Comparendo</th>
+        <th>Fecha</th><th>Notif. ORDEN</th><th>Estado</th><th>Resultado</th><th>Acciones</th>
+      </tr></thead><tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ---------- VENCIMIENTOS ---------- -->
+<section id="t-venc" style="display:none">
+  <div class="panel scroll">
+    <h2>Términos en curso (días hábiles, festivos colombianos)</h2>
+    <table class="tabla" id="tablaVenc"><thead><tr>
+      <th>Radicado</th><th>Accionante</th><th>Tipo</th><th>Juzgado</th>
+      <th>Vence</th><th>Días hábiles</th><th>Estado</th>
+    </tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<!-- ---------- CONSOLIDADO ---------- -->
+<section id="t-conso" style="display:none">
+  <div class="panel">
+    <div class="filtros">
+      <label>Mes<input type="month" id="mesConso" onchange="pintarConsolidado()"></label>
+    </div>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="panel"><h3>Actuaciones por tipo</h3><div class="grafico"><canvas id="gTipo"></canvas></div>
+  <h3>Volumen diario del mes</h3><div class="grafico"><canvas id="gLinea"></canvas></div>
+  <h3>Resultados</h3><div class="grafico"><canvas id="gRes"></canvas></div></div>
+</section>
+
+<!-- ---------- REPORTES ---------- -->
+<section id="t-rep" style="display:none">
+  <div class="panel">
+    <h2>Generador de reportes</h2>
+    <p style="font-size:12.5px;color:var(--tinta2);margin-bottom:10px">Usa los filtros de la pestaña Casos. Lo que ves allí es lo que se exporta.</p>
+    <div class="acciones" style="gap:8px">
+      <button class="btn primario" onclick="expExcel()">Descargar Excel</button>
+      <button class="btn" onclick="expCSV()">Descargar CSV</button>
+      <button class="btn" onclick="expPDF()">Descargar PDF institucional</button>
+    </div>
+    <h3>Reportes predefinidos</h3>
+    <div class="acciones" style="gap:8px">
+      <button class="btn" onclick="repMensual()">Informe mensual de actuaciones</button>
+      <button class="btn" onclick="repNotificaciones()">Reporte de notificaciones</button>
+      <button class="btn" onclick="repPendientes()">Reporte de pendientes</button>
+      <button class="btn" onclick="repExpediente()">Reporte de expediente (búsqueda activa)</button>
+    </div>
+    <h3>Gráficos exportables</h3>
+    <div class="acciones" style="gap:8px">
+      <button class="btn mini" onclick="descargarGrafico('gTipo')">PNG · por tipo</button>
+      <button class="btn mini" onclick="descargarGrafico('gLinea')">PNG · volumen diario</button>
+      <button class="btn mini" onclick="descargarGrafico('gRes')">PNG · resultados</button>
+    </div>
+    <h3>Verificación</h3>
+    <div class="acciones" style="gap:8px">
+      <button class="btn" onclick="correrConsistencia()">Verificación de consistencia</button>
+    </div>
+    <pre id="salidaConsistencia" style="font-size:12px;white-space:pre-wrap;margin-top:8px"></pre>
+  </div>
+</section>
+
+<!-- ---------- APROBACIONES ---------- -->
+<section id="t-apro" style="display:none">
+  <div class="panel">
+    <h2>Correos pendientes de aprobación</h2>
+    <div id="listaPend"></div>
+    <button class="btn primario" id="btnDespachar" onclick="despachar()">Despachar aprobados</button>
+  </div>
+  <div class="panel">
+    <h2>Posibles duplicados por resolver</h2>
+    <div id="listaDup"></div>
+  </div>
+  <div class="panel scroll">
+    <h2>Historial de correos</h2>
+    <table class="tabla" id="tablaHist"><thead><tr>
+      <th>Id correo</th><th>Caso</th><th>Tipo</th><th>Destinatario</th>
+      <th>Estado</th><th>Aprobó</th><th>Envío</th>
+    </tr></thead><tbody></tbody></table>
+  </div>
+</section>
+
+<!-- ---------- AUDITORÍA ---------- -->
+<section id="t-aud" style="display:none">
+  <div class="panel scroll">
+    <h2>Registro de auditoría (últimas 500 acciones)</h2>
+    <div class="filtros" style="margin-bottom:10px">
+      <label>Filtrar<input id="fAud" oninput="pintarAuditoria()" placeholder="acción, caso, texto"></label>
+      <button class="btn" onclick="cargarAuditoria()">Actualizar</button>
+      <button class="btn" onclick="expAuditoria()">Exportar Excel</button>
+    </div>
+    <table class="tabla" id="tablaAud"><thead><tr>
+      <th>Fecha y hora</th><th>Acción</th><th>Afectado</th><th>Anterior</th><th>Nuevo</th><th>Detalle</th>
+    </tr></thead><tbody></tbody></table>
+  </div>
+</section>
+</main>
+</div>
+
+<div id="velo" onclick="if(event.target===this)cerrarModal()"><div class="modal" id="modalCont"></div></div>
+<div id="toast"></div>
+
+<script>
+/* =================== CONFIGURACIÓN =================== */
+var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyG-QJAl89aKfB20VSoY-LZg6bWjtTxXxfwcUQ-95RFX1UqZwX8JZNMI2F37hIJuocG/exec";
+/* ===================================================== */
+
+var TOKEN = sessionStorage.getItem("mx_token") || "";
+var CASOS = [], CORREOS = [], AUD = [], charts = {};
+var FESTIVOS = ["2026-01-01","2026-01-12","2026-03-23","2026-04-02","2026-04-03","2026-05-01",
+"2026-05-18","2026-06-08","2026-06-15","2026-06-29","2026-07-20","2026-08-07","2026-08-17",
+"2026-10-12","2026-11-02","2026-11-16","2026-12-08","2026-12-25","2027-01-01","2027-01-11",
+"2027-03-22","2027-03-25","2027-03-26","2027-05-01","2027-05-10","2027-05-31","2027-06-07",
+"2027-07-05","2027-07-20","2027-08-09","2027-08-16","2027-10-18","2027-11-01","2027-11-15",
+"2027-12-08","2027-12-25"];
+var TIPO_TXT = {PETICION_GENERAL:"Petición general",PETICION_COMPARENDO:"Petición con comparendo",
+                TUTELA:"Tutela",RECURSO_REPOSICION:"Recurso de reposición"};
+var TIPO_COD = {PETICION_GENERAL:"PG",PETICION_COMPARENDO:"PC",TUTELA:"TU",RECURSO_REPOSICION:"RR"};
+
+function toast(m){var t=document.getElementById("toast");t.textContent=m;t.style.display="block";
+  clearTimeout(t._h);t._h=setTimeout(function(){t.style.display="none"},3500)}
+
+async function api(action, extra){
+  var body = Object.assign({action:action, token:TOKEN}, extra||{});
+  var r = await fetch(APPS_SCRIPT_URL,{method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(body)});
+  var j = await r.json();
+  if(j && j.error==="SESION_INVALIDA"){ salir(true); throw new Error("Sesión vencida"); }
+  return j;
+}
+
+/* ------------ sesión ------------ */
+async function entrar(){
+  var clave=document.getElementById("clave").value, err=document.getElementById("loginError");
+  err.textContent="Validando...";
+  try{
+    var r=await fetch(APPS_SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({action:"login",clave:clave})});
+    var j=await r.json();
+    if(!j.ok){err.textContent=j.error;return}
+    TOKEN=j.token; sessionStorage.setItem("mx_token",TOKEN);
+    document.getElementById("login").style.display="none";
+    document.getElementById("app").style.display="block";
+    err.textContent=""; cargar(true);
+  }catch(e){err.textContent="No fue posible conectar con el servidor. Verifique la URL del Apps Script."}
+}
+function salir(silencioso){
+  if(TOKEN && !silencioso) api("logout").catch(function(){});
+  TOKEN=""; sessionStorage.removeItem("mx_token");
+  document.getElementById("app").style.display="none";
+  document.getElementById("login").style.display="flex";
+  document.getElementById("clave").value="";
+  if(silencioso) document.getElementById("loginError").textContent="La sesión venció. Ingrese de nuevo.";
+}
+document.getElementById("clave").addEventListener("keydown",function(e){if(e.key==="Enter")entrar()});
+
+/* ------------ datos ------------ */
+async function cargar(manual){
+  if(!TOKEN) return;
+  try{
+    var j=await api("getDatos");
+    if(!j.ok){toast(j.error);return}
+    CASOS=j.casos||[]; CORREOS=j.correos||[];
+    poblarLotes(); pintarCasos(); pintarVenc(); pintarConsolidado(); pintarAprobaciones();
+    if(manual)toast("Datos actualizados");
+  }catch(e){ if(manual)toast("Error al cargar: "+e.message) }
+}
+setInterval(function(){cargar(false)},60000);
+if(TOKEN){document.getElementById("login").style.display="none";
+  document.getElementById("app").style.display="block";cargar(true);}
+
+function tab(t){
+  ["casos","venc","conso","rep","apro","aud"].forEach(function(x){
+    document.getElementById("t-"+x).style.display = x===t?"block":"none";
+  });
+  document.querySelectorAll("nav button").forEach(function(b){
+    b.classList.toggle("activo",b.dataset.t===t);
+  });
+  if(t==="aud"&&!AUD.length)cargarAuditoria();
+  if(t==="conso")pintarConsolidado();
+}
+
+/* ------------ utilidades ------------ */
+function norm(s){return (s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+  .replace(/[^a-z0-9ñ\s]/g," ").replace(/\s+/g," ").trim()}
+function mismoNombre(a,b){
+  var sa=norm(a).split(" ").filter(Boolean), sb=norm(b).split(" ").filter(Boolean);
+  if(!sa.length||!sb.length)return false;
+  var inter=sa.filter(function(w){return sb.indexOf(w)>=0}).length;
+  return inter>=Math.max(2,Math.min(sa.length,sb.length)-1)&&inter/Math.max(sa.length,sb.length)>=0.6;
+}
+function esc(s){return (s||"").replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function diasHabiles(fechaISO){
+  if(!fechaISO)return null;
+  var hoy=new Date();hoy.setHours(0,0,0,0);
+  var fin=new Date(fechaISO+"T00:00:00");if(isNaN(fin))return null;
+  var dir=fin>=hoy?1:-1,n=0,d=new Date(hoy);
+  while(dir===1?d<fin:d>fin){
+    d.setDate(d.getDate()+dir);
+    var iso=d.toISOString().slice(0,10);
+    if(d.getDay()!==0&&d.getDay()!==6&&FESTIVOS.indexOf(iso)<0)n++;
+  }
+  return n*dir;
+}
+function rad(idCaso){
+  var cod=(idCaso||"").split("-")[1]||"";
+  return '<span class="rad '+cod+'"><i></i><span>'+esc(idCaso||"—")+'</span></span>';
+}
+
+/* ------------ CASOS ------------ */
+var expedienteActivo=null;
+function poblarLotes(){
+  var sel=document.getElementById("fLote"),v=sel.value;
+  var lotes=Array.from(new Set(CASOS.map(function(c){return c.lote}).filter(Boolean))).sort();
+  sel.innerHTML='<option value="">Todos</option>'+lotes.map(function(l){
+    return '<option'+(l===v?" selected":"")+'>'+esc(l)+'</option>'}).join("");
+}
+function filtrarCasos(){
+  var q=norm(document.getElementById("fBuscar").value);
+  var d1=document.getElementById("fDesde").value,d2=document.getElementById("fHasta").value;
+  var tp=document.getElementById("fTipo").value,es=document.getElementById("fEstado").value;
+  var lo=document.getElementById("fLote").value;
+  return CASOS.filter(function(c){
+    if(expedienteActivo && !enExpediente(c,expedienteActivo))return false;
+    if(tp&&c.tipo_actuacion!==tp)return false;
+    if(es&&c.estado_proceso!==es)return false;
+    if(lo&&c.lote!==lo)return false;
+    var f=(c.fecha_registro||"").slice(0,10);
+    if(d1&&f<d1)return false; if(d2&&f>d2)return false;
+    if(q){
+      var blob=norm([c.id_caso,c.accionante_peticionario,c.comparendo,c.placa,c.notas,
+                     c.resumen_peticiones,c.lote].join(" "));
+      if(blob.indexOf(q)<0 && !mismoNombre(q,c.accionante_peticionario))return false;
+    }
+    return true;
+  });
+}
+function enExpediente(c,clave){
+  if(c.id_caso===clave.id||c.id_caso_relacionado===clave.id)return true;
+  if(clave.comparendo&&c.comparendo===clave.comparendo)return true;
+  if(clave.nombre&&mismoNombre(c.accionante_peticionario,clave.nombre))return true;
+  return false;
+}
+function modoExpediente(){
+  var q=document.getElementById("fBuscar").value.trim();
+  if(!q){toast("Escriba primero un nombre o comparendo en el buscador");return}
+  var semilla=CASOS.find(function(c){
+    return c.comparendo===q||c.id_caso===q||mismoNombre(q,c.accionante_peticionario)});
+  expedienteActivo={id:semilla?semilla.id_caso:"",comparendo:/^\d{6,}$/.test(q)?q:(semilla?semilla.comparendo:""),
+                    nombre:/^\d+$/.test(q)?(semilla?semilla.accionante_peticionario:""):q};
+  pintarCasos();
+  toast("Expediente activo. Use Limpiar para salir.");
+}
+function limpiarFiltros(){
+  expedienteActivo=null;
+  ["fBuscar","fDesde","fHasta","fTipo","fEstado","fLote"].forEach(function(i){
+    document.getElementById(i).value=""});
+  pintarCasos();
+}
+function pintarCasos(){
+  var lista=filtrarCasos();
+  lista.sort(function(a,b){return (b.fecha_registro||"").localeCompare(a.fecha_registro||"")});
+  document.getElementById("resumenFiltro").textContent=
+    (expedienteActivo?"EXPEDIENTE COMPLETO · ":"")+lista.length+" actuaciones";
+  var tb=document.querySelector("#tablaCasos tbody");
+  tb.innerHTML=lista.map(function(c){
+    var dupTag=c.estado_duplicado==="POSIBLE_DUPLICADO"||c.estado_duplicado==="DUPLICADO_CONFIRMADO"
+      ?' <span class="dup">'+c.estado_duplicado.replace("_"," ")+'</span>'
+      :(c.estado_duplicado==="REITERACION"?' <span class="reit">REITERACIÓN</span>':"");
+    var notaTag=c.notas?' <span class="notaTag">notas</span>':"";
+    var esPet=c.tipo_actuacion.indexOf("PETICION")===0;
+    var acc=[];
+    if(c.enlace_drive_principal)acc.push('<a class="enl" target="_blank" href="'+esc(c.enlace_drive_principal)+'">Word</a>');
+    if(c.enlace_drive_pdf)acc.push('<a class="enl" target="_blank" href="'+esc(c.enlace_drive_pdf)+'">PDF</a>');
+    if(c.enlace_drive_carpeta)acc.push('<a class="enl" target="_blank" href="'+esc(c.enlace_drive_carpeta)+'">Carpeta</a>');
+    if(c.enlace_constancia)acc.push('<a class="enl" target="_blank" href="'+esc(c.enlace_constancia)+'">Constancia</a>');
+    if(c.enlace_gmail)acc.push('<a class="enl" target="_blank" href="'+esc(c.enlace_gmail)+'">Abrir en Gmail</a>');
+    acc.push('<button class="btn mini" onclick="verNotas(\''+c.id_caso+'\')">Notas</button>');
+    acc.push('<button class="btn mini" onclick="verExpedienteModal(\''+c.id_caso+'\')">Expediente</button>');
+    acc.push('<select class="btn mini" onchange="cambiarEstado(\''+c.id_caso+'\',this.value);this.value=\'\'">'+
+      '<option value="">Estado…</option><option>PROYECTADO</option><option>REVISADO</option>'+
+      '<option>NOTIFICADO</option><option>ERROR</option></select>');
+    if(esPet&&(c.estado_proceso==="REVISADO"||c.estado_proceso==="NOTIFICADO"))
+      acc.push('<button class="btn mini" onclick="modalRenotificar(\''+c.id_caso+'\')">Nueva notificación</button>');
+    if(c.tipo_actuacion==="TUTELA"){
+      var rel=peticionRelacionada(c);
+      var lista_ok=rel&&rel.estado_proceso==="NOTIFICADO";
+      acc.push('<button class="btn mini" '+(lista_ok?"":'disabled title="Petición relacionada sin notificar"')+
+        ' onclick="descargarPaquete(\''+c.id_caso+'\')">Paquete tutela</button>');
+    }
+    if(c.hash_pdf_enviado)
+      acc.push('<button class="btn mini" onclick="verificarHash(\''+c.id_caso+'\')">Verificar hash</button>');
+    return "<tr><td>"+rad(c.id_caso)+dupTag+notaTag+"</td>"+
+      "<td><b>"+esc(c.accionante_peticionario)+"</b><br><small style='color:var(--tinta2)'>"+
+      esc(TIPO_TXT[c.tipo_actuacion]||c.tipo_actuacion)+(c.lote?" · "+esc(c.lote):"")+"</small></td>"+
+      "<td class='mono'>"+esc(c.comparendo||"—")+"</td>"+
+      "<td>"+esc((c.fecha_registro||"").slice(0,10))+"</td>"+
+      "<td>"+esc(c.estado_notificacion_orden||"—")+"</td>"+
+      "<td><span class='estado "+c.estado_proceso+"'>"+esc(c.estado_proceso)+"</span></td>"+
+      "<td>"+esc(c.resultado||"—")+"</td>"+
+      "<td><div class='acciones'>"+acc.join("")+"</div></td></tr>";
+  }).join("")||"<tr><td colspan=8 style='color:var(--tinta2);padding:24px'>Sin casos para los filtros actuales. Ajuste la búsqueda o registre un lote.</td></tr>";
+}
+function peticionRelacionada(tut){
+  var rel=null;
+  if(tut.id_caso_relacionado)
+    rel=CASOS.find(function(x){return x.id_caso===tut.id_caso_relacionado});
+  if(!rel&&tut.comparendo)
+    rel=CASOS.find(function(x){return x.comparendo===tut.comparendo&&x.tipo_actuacion.indexOf("PETICION")===0&&x.estado_proceso==="NOTIFICADO"});
+  return rel;
+}
+async function cambiarEstado(id,estado){
+  if(!estado)return;
+  var j=await api("setEstado",{id_caso:id,estado:estado});
+  toast(j.ok?"Estado actualizado a "+estado:j.error); cargar(false);
+}
+async function verificarHash(id){
+  toast("Verificando...");
+  var j=await api("verificarHash",{id_caso:id});
+  if(!j.ok){toast(j.error);return}
+  abrirModal("<h2>Verificación de integridad <button class='cerrar' onclick='cerrarModal()'>×</button></h2>"+
+    "<p style='font-weight:700;color:"+(j.coincide?"var(--sello)":"var(--rojo)")+"'>"+
+    (j.coincide?"El PDF en Drive es IDÉNTICO al notificado.":"ALERTA: el PDF NO coincide con el notificado.")+
+    "</p><p class='mono' style='font-size:11px;word-break:break-all'>Notificado: "+j.esperado+
+    "<br>Actual: "+j.actual+"</p>");
+}
+async function descargarPaquete(id){
+  toast("Armando paquete...");
+  var j=await api("paqueteTutela",{id_caso:id});
+  if(!j.ok){toast(j.error);return}
+  window.open(j.url,"_blank");
+  toast("Paquete listo (petición "+j.relacionado+")");
+}
+
+/* notas */
+function verNotas(id){
+  var c=CASOS.find(function(x){return x.id_caso===id});
+  abrirModal("<h2>Notas — "+rad(id)+" <button class='cerrar' onclick='cerrarModal()'>×</button></h2>"+
+    "<div style='white-space:pre-wrap;font-size:13px;margin-bottom:12px'>"+
+    (esc(c.notas)||"<i style='color:var(--tinta2)'>Sin notas.</i>")+"</div>"+
+    "<textarea id='notaNueva' rows=3 style='width:100%' placeholder='Nueva anotación...'></textarea>"+
+    "<div style='margin-top:8px'><button class='btn primario' onclick='guardarNota(\""+id+"\")'>Agregar nota</button></div>");
+}
+async function guardarNota(id){
+  var t=document.getElementById("notaNueva").value.trim();
+  if(!t)return;
+  var j=await api("addNota",{id_caso:id,texto:t});
+  toast(j.ok?"Nota guardada":j.error); cerrarModal(); cargar(false);
+}
+
+/* expediente modal (trazabilidad) */
+function verExpedienteModal(id){
+  var c=CASOS.find(function(x){return x.id_caso===id});
+  var rel=CASOS.filter(function(x){return enExpediente(x,{id:c.id_caso,comparendo:c.comparendo,
+    nombre:c.accionante_peticionario})});
+  rel.sort(function(a,b){return (a.fecha_registro||"").localeCompare(b.fecha_registro||"")});
+  var html=rel.map(function(x){
+    var notif=(x.historial_notificaciones||"").split("|").filter(Boolean).map(function(n){
+      return "<div style='font-size:11.5px;color:var(--tinta2)'>"+esc(n.trim())+"</div>"}).join("");
+    return "<div class='hito'><b>"+rad(x.id_caso)+"</b> · "+esc(TIPO_TXT[x.tipo_actuacion]||"")+
+      " · <span class='estado "+x.estado_proceso+"'>"+x.estado_proceso+"</span>"+
+      "<div style='font-size:12px'>"+esc((x.fecha_registro||"").slice(0,10))+
+      (x.resultado?" · "+esc(x.resultado):"")+"</div>"+notif+
+      (x.notas?"<div style='font-size:11.5px;background:#FFF9E4;border-radius:4px;padding:4px 6px;margin-top:3px;white-space:pre-wrap'>"+esc(x.notas)+"</div>":"")+
+      "</div>";
+  }).join("");
+  abrirModal("<h2>Expediente — "+esc(c.accionante_peticionario)+
+    " <button class='cerrar' onclick='cerrarModal()'>×</button></h2><div class='timeline'>"+html+"</div>");
+}
+
+/* renotificación */
+function modalRenotificar(id){
+  var c=CASOS.find(function(x){return x.id_caso===id});
+  abrirModal("<h2>Nueva notificación — "+rad(id)+" <button class='cerrar' onclick='cerrarModal()'>×</button></h2>"+
+    "<p style='font-size:12.5px;color:var(--tinta2);margin-bottom:10px'>Se enviarán los MISMOS adjuntos del caso (PDF de la contestación y anexos registrados en Drive). El envío queda pendiente de su aprobación.</p>"+
+    "<label style='font-size:12px;font-weight:600'>Nuevo correo<br><input id='rnCorreo' style='width:100%' placeholder='correo@dominio.com' value=''></label>"+
+    "<label style='font-size:12px;font-weight:600;display:block;margin-top:8px'>Motivo (opcional)<br><input id='rnMotivo' style='width:100%' placeholder='Ej.: correo corregido por el peticionario'></label>"+
+    "<div style='margin-top:12px'><button class='btn primario' onclick='crearRenotificacion(\""+id+"\")'>Crear borrador para aprobación</button></div>");
+}
+async function crearRenotificacion(id){
+  var correo=document.getElementById("rnCorreo").value.trim();
+  var motivo=document.getElementById("rnMotivo").value.trim();
+  var j=await api("nuevaRenotificacion",{id_caso:id,correo:correo,motivo:motivo});
+  toast(j.ok?"Borrador creado; apruébelo en la pestaña Aprobaciones":j.error);
+  cerrarModal(); cargar(false); if(j.ok)tab("apro");
+}
+
+/* ------------ VENCIMIENTOS ------------ */
+function pintarVenc(){
+  var lista=CASOS.filter(function(c){return c.fecha_vencimiento&&c.estado_proceso!=="NOTIFICADO"});
+  lista.forEach(function(c){c._dh=diasHabiles((c.fecha_vencimiento||"").slice(0,10))});
+  lista.sort(function(a,b){return (a._dh===null?999:a._dh)-(b._dh===null?999:b._dh)});
+  var criticos=lista.filter(function(c){return c._dh!==null&&c._dh<=2}).length;
+  var pill=document.getElementById("pillVenc");
+  pill.style.display=criticos?"inline":"none"; pill.textContent=criticos;
+  document.querySelector("#tablaVenc tbody").innerHTML=lista.map(function(c){
+    var clase=c._dh===null?"":(c._dh<=2?"venc-alerta":(c._dh<=5?"venc-pronto":""));
+    var etiqueta=c._dh===null?"—":(c._dh<0?"VENCIDO hace "+(-c._dh)+" d.h.":c._dh+" días hábiles");
+    return "<tr class='"+clase+"'><td>"+rad(c.id_caso)+"</td><td>"+esc(c.accionante_peticionario)+
+      "</td><td>"+esc(TIPO_TXT[c.tipo_actuacion]||"")+"</td><td>"+esc(c.juzgado||"—")+
+      "</td><td>"+esc((c.fecha_vencimiento||"").slice(0,10))+"</td><td><b>"+etiqueta+
+      "</b></td><td><span class='estado "+c.estado_proceso+"'>"+c.estado_proceso+"</span></td></tr>";
+  }).join("")||"<tr><td colspan=7 style='color:var(--tinta2);padding:20px'>No hay casos con término registrado.</td></tr>";
+}
+
+/* ------------ CONSOLIDADO ------------ */
+function pintarConsolidado(){
+  var sel=document.getElementById("mesConso");
+  if(!sel.value){var h=new Date();sel.value=h.toISOString().slice(0,7)}
+  var mes=sel.value;
+  var prev=new Date(mes+"-15");prev.setMonth(prev.getMonth()-1);
+  var mesPrev=prev.toISOString().slice(0,7);
+  var del=function(m){return CASOS.filter(function(c){return (c.fecha_registro||"").slice(0,7)===m})};
+  var act=del(mes),ant=del(mesPrev);
+  var tipos=["PETICION_GENERAL","PETICION_COMPARENDO","TUTELA","RECURSO_REPOSICION"];
+  var kpis=[{n:"Total del mes",v:act.length,p:ant.length}];
+  tipos.forEach(function(t){
+    kpis.push({n:TIPO_TXT[t],v:act.filter(function(c){return c.tipo_actuacion===t}).length,
+               p:ant.filter(function(c){return c.tipo_actuacion===t}).length})});
+  kpis.push({n:"En error",v:act.filter(function(c){return c.estado_proceso==="ERROR"}).length});
+  kpis.push({n:"Pendientes de revisión",v:CASOS.filter(function(c){return c.estado_proceso==="PROYECTADO"}).length});
+  document.getElementById("kpis").innerHTML=kpis.map(function(k){
+    var delta="";
+    if(k.p!==undefined&&k.p!==null){
+      var d=k.v-k.p;
+      delta="<span class='delta "+(d>=0?"up":"down")+"'>"+(d>=0?"+":"")+d+" vs mes anterior</span>";
+    }
+    return "<div class='kpi'><small>"+k.n+"</small><b>"+k.v+"</b>"+delta+"</div>";
+  }).join("");
+  grafico("gTipo","bar",tipos.map(function(t){return TIPO_TXT[t]}),
+    [{label:mes,data:tipos.map(function(t){return act.filter(function(c){return c.tipo_actuacion===t}).length}),
+      backgroundColor:"#1E6B43"},
+     {label:mesPrev,data:tipos.map(function(t){return ant.filter(function(c){return c.tipo_actuacion===t}).length}),
+      backgroundColor:"#B9CDC2"}]);
+  var dias={},i;
+  act.forEach(function(c){var d=(c.fecha_registro||"").slice(0,10);dias[d]=(dias[d]||0)+1});
+  var claves=Object.keys(dias).sort();
+  grafico("gLinea","line",claves,[{label:"Actuaciones",data:claves.map(function(k){return dias[k]}),
+    borderColor:"#16425B",backgroundColor:"rgba(22,66,91,.12)",fill:true,tension:.25}]);
+  var res={};act.forEach(function(c){if(c.resultado)res[c.resultado]=(res[c.resultado]||0)+1});
+  grafico("gRes","doughnut",Object.keys(res),[{data:Object.keys(res).map(function(k){return res[k]}),
+    backgroundColor:["#1E6B43","#B07A1E","#A8322D","#2B5FA3","#7A3E9D"]}]);
+}
+function grafico(id,tipo,labels,datasets){
+  if(charts[id])charts[id].destroy();
+  charts[id]=new Chart(document.getElementById(id),{type:tipo,
+    data:{labels:labels,datasets:datasets},
+    options:{responsive:true,plugins:{legend:{labels:{font:{family:"'Libre Franklin'"}}}}}});
+}
+function descargarGrafico(id){
+  if(!charts[id]){toast("Abra primero la pestaña Consolidado");return}
+  var a=document.createElement("a");
+  a.href=charts[id].toBase64Image("image/png",1);
+  a.download=id+"_"+new Date().toISOString().slice(0,10)+".png";a.click();
+}
+
+/* ------------ APROBACIONES ------------ */
+function pintarAprobaciones(){
+  var pend=CORREOS.filter(function(c){return c.estado==="PENDIENTE_APROBACION"});
+  var pill=document.getElementById("pillApro");
+  pill.style.display=pend.length?"inline":"none";pill.textContent=pend.length;
+  document.getElementById("btnDespachar").disabled=
+    !CORREOS.some(function(c){return c.estado==="APROBADO"});
+  document.getElementById("listaPend").innerHTML=pend.map(function(c){
+    var adj=(c.adjuntos||"").split(";").filter(Boolean).map(function(id,i){
+      return '<a class="enl" target="_blank" href="https://drive.google.com/file/d/'+id+'/view">Adjunto '+(i+1)+'</a>'}).join(" · ");
+    return "<div class='correoPrev'><div class='meta'><b>"+esc(c.tipo)+"</b> · "+esc(c.id_correo)+
+      (c.id_caso?" · "+rad(c.id_caso):"")+"<br>Para: <b>"+esc(c.destinatarios)+"</b>"+
+      (c.motivo?" · Motivo: "+esc(c.motivo):"")+"<br>Asunto: "+esc(c.asunto)+"</div>"+
+      (adj?"<div style='font-size:12px;margin-bottom:6px'>Adjuntos: "+adj+"</div>":"")+
+      "<div class='cuerpo'>"+c.cuerpo_html+"</div>"+
+      "<div class='acciones' style='margin-top:8px'>"+
+      "<button class='btn primario mini' onclick=\"decidir('"+c.id_correo+"','aprobar')\">Aprobar</button>"+
+      "<button class='btn peligro mini' onclick=\"decidir('"+c.id_correo+"','rechazar')\">Rechazar</button>"+
+      "</div></div>";
+  }).join("")||"<p style='color:var(--tinta2)'>No hay correos pendientes de aprobación.</p>";
+
+  var dups=CASOS.filter(function(c){return c.estado_duplicado==="POSIBLE_DUPLICADO"});
+  document.getElementById("listaDup").innerHTML=dups.map(function(c){
+    var orig=CASOS.find(function(x){return x.id_caso===c.id_caso_relacionado})||{};
+    return "<div class='correoPrev'><div class='meta'>"+rad(c.id_caso)+" · <b>"+
+      esc(c.accionante_peticionario)+"</b> · radicado "+esc(c.fecha_radicacion||"—")+
+      "<br><span style='font-size:11.5px'>«"+esc((c.resumen_peticiones||"").slice(0,220))+"»</span></div>"+
+      "<div class='meta' style='border-top:1px dashed var(--linea);padding-top:6px'>Posible original: "+
+      rad(orig.id_caso||c.id_caso_relacionado)+" · radicado "+esc(orig.fecha_radicacion||"—")+
+      "<br><span style='font-size:11.5px'>«"+esc((orig.resumen_peticiones||"").slice(0,220))+"»</span></div>"+
+      "<div class='acciones' style='margin-top:8px'>"+
+      "<button class='btn peligro mini' onclick=\"resolverDup('"+c.id_caso+"','DUPLICADO_CONFIRMADO')\">Confirmar duplicado</button>"+
+      "<button class='btn mini' onclick=\"resolverDup('"+c.id_caso+"','REITERACION')\">Es reiteración</button>"+
+      "<button class='btn mini' onclick=\"resolverDup('"+c.id_caso+"','NUEVO')\">Es caso nuevo</button>"+
+      "</div></div>";
+  }).join("")||"<p style='color:var(--tinta2)'>No hay posibles duplicados pendientes de decisión.</p>";
+
+  var hist=CORREOS.filter(function(c){return c.estado!=="PENDIENTE_APROBACION"});
+  hist.sort(function(a,b){return (b.fecha_preparacion||"").localeCompare(a.fecha_preparacion||"")});
+  document.querySelector("#tablaHist tbody").innerHTML=hist.slice(0,100).map(function(c){
+    return "<tr><td class='mono'>"+esc(c.id_correo)+"</td><td>"+(c.id_caso?rad(c.id_caso):"—")+
+      "</td><td>"+esc(c.tipo)+"</td><td>"+esc(c.destinatarios)+"</td><td><span class='estado "+
+      (c.estado==="ENVIADO"?"NOTIFICADO":(c.estado==="RECHAZADO"?"ERROR":"REVISADO"))+"'>"+
+      esc(c.estado)+"</span></td><td>"+esc(c.aprobado_por||"—")+"</td><td>"+
+      esc(c.fecha_envio||"—")+"</td></tr>";
+  }).join("");
+}
+async function decidir(id,que){
+  var j=await api(que==="aprobar"?"aprobarCorreo":"rechazarCorreo",{id_correo:id});
+  toast(j.ok?(que==="aprobar"?"Aprobado":"Rechazado"):j.error); cargar(false);
+}
+async function despachar(){
+  if(!confirm("¿Despachar TODOS los correos aprobados? Se enviarán inmediatamente."))return;
+  toast("Despachando...");
+  var j=await api("despacharAprobados");
+  toast(j.ok?("Enviados: "+j.enviados+(j.errores.length?" · Errores: "+j.errores.length:"")):j.error);
+  cargar(false);
+}
+async function resolverDup(id,dec){
+  var j=await api("resolverDuplicado",{id_caso:id,decision:dec});
+  toast(j.ok?"Decisión registrada: "+dec:j.error); cargar(false);
+}
+
+/* ------------ AUDITORÍA ------------ */
+async function cargarAuditoria(){
+  var j=await api("getAuditoria");
+  if(j.ok){AUD=j.filas;pintarAuditoria()}
+}
+function pintarAuditoria(){
+  var q=norm(document.getElementById("fAud").value);
+  var filas=AUD.filter(function(a){
+    return !q||norm([a.accion,a.id_afectado,a.detalle,a.valor_nuevo].join(" ")).indexOf(q)>=0});
+  document.querySelector("#tablaAud tbody").innerHTML=filas.slice().reverse().map(function(a){
+    return "<tr><td class='mono' style='white-space:nowrap'>"+esc(a.fecha_hora)+"</td><td><b>"+
+      esc(a.accion)+"</b></td><td class='mono'>"+esc(a.id_afectado)+"</td><td>"+
+      esc(a.valor_anterior)+"</td><td>"+esc(a.valor_nuevo)+"</td><td>"+esc(a.detalle)+"</td></tr>";
+  }).join("");
+}
+function expAuditoria(){
+  var ws=XLSX.utils.json_to_sheet(AUD);
+  var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"AUDITORIA");
+  XLSX.writeFile(wb,"auditoria_"+hoyISO()+".xlsx");
+}
+
+/* ------------ REPORTES ------------ */
+function hoyISO(){return new Date().toISOString().slice(0,10)}
+var COLS_EXPORT=["id_caso","id_caso_relacionado","fecha_registro","fecha_radicacion","lote",
+"accionante_peticionario","comparendo","placa","tipo_actuacion","estado_notificacion_orden",
+"estado_proceso","resultado","estado_duplicado","fecha_vencimiento","juzgado",
+"correo_notificacion","fecha_notificacion_correo","enlace_drive_pdf","enlace_constancia",
+"observaciones","notas"];
+function filasExport(lista){
+  return lista.map(function(c){var o={};COLS_EXPORT.forEach(function(k){o[k]=c[k]||""});return o});
+}
+function resumenPorTipo(lista){
+  var out=[];
+  Object.keys(TIPO_TXT).forEach(function(t){
+    var del=lista.filter(function(c){return c.tipo_actuacion===t});
+    if(del.length)out.push({tipo:TIPO_TXT[t],total:del.length,
+      notificados:del.filter(function(c){return c.estado_proceso==="NOTIFICADO"}).length,
+      pendientes:del.filter(function(c){return c.estado_proceso!=="NOTIFICADO"}).length})});
+  return out;
+}
+function expExcel(lista,nombre){
+  lista=lista||filtrarCasos();nombre=nombre||("casos_"+hoyISO());
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(filasExport(lista)),"DETALLE");
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(resumenPorTipo(lista)),"RESUMEN");
+  XLSX.writeFile(wb,nombre+".xlsx");guardarEnDrive(wb,nombre+".xlsx");
+}
+function expCSV(){
+  var lista=filasExport(filtrarCasos());
+  var csv=XLSX.utils.sheet_to_csv(XLSX.utils.json_to_sheet(lista));
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob(["\uFEFF"+csv],{type:"text/csv"}));
+  a.download="casos_"+hoyISO()+".csv";a.click();
+}
+function encabezadoPDF(doc,titulo,periodo){
+  doc.setFont("helvetica","bold");doc.setFontSize(11);
+  doc.text("SECRETARÍA DE GOBIERNO, SEGURIDAD Y CONVIVENCIA CIUDADANA",105,14,{align:"center"});
+  doc.text("CON FUNCIONES DE TRÁNSITO Y TRANSPORTE",105,20,{align:"center"});
+  doc.setFontSize(10);doc.text("MUNICIPIO DE OBANDO, VALLE DEL CAUCA",105,26,{align:"center"});
+  doc.setDrawColor(30,107,67);doc.setLineWidth(.7);doc.line(14,30,196,30);
+  doc.setFontSize(12);doc.text(titulo,105,38,{align:"center"});
+  doc.setFont("helvetica","normal");doc.setFontSize(9);
+  doc.text("Período: "+periodo+"   ·   Generado: "+new Date().toLocaleString("es-CO"),105,44,{align:"center"});
+  return 50;
+}
+async function expPDF(lista,titulo,nombre){
+  lista=lista||filtrarCasos();titulo=titulo||"REPORTE DE ACTUACIONES";
+  nombre=nombre||("reporte_"+hoyISO());
+  var doc=new jspdf.jsPDF();
+  var y=encabezadoPDF(doc,titulo,hoyISO());
+  doc.autoTable({startY:y,head:[["Tipo","Total","Notificados","Pendientes"]],
+    body:resumenPorTipo(lista).map(function(r){return [r.tipo,r.total,r.notificados,r.pendientes]}),
+    styles:{fontSize:9},headStyles:{fillColor:[24,36,48]}});
+  y=doc.lastAutoTable.finalY+6;
+  ["gTipo","gRes"].forEach(function(g){
+    if(charts[g]){try{
+      doc.addImage(charts[g].toBase64Image("image/png",1),"PNG",20,y,80,45);y+=50;
+    }catch(e){}}});
+  doc.autoTable({startY:y+4,
+    head:[["Radicado","Peticionario","Comparendo","Tipo","Estado","Resultado","Fecha"]],
+    body:lista.map(function(c){return [c.id_caso,c.accionante_peticionario,c.comparendo,
+      TIPO_TXT[c.tipo_actuacion]||"",c.estado_proceso,c.resultado,(c.fecha_registro||"").slice(0,10)]}),
+    styles:{fontSize:7.5},headStyles:{fillColor:[30,107,67]}});
+  doc.save(nombre+".pdf");
+  guardarPdfEnDrive(doc,nombre+".pdf");
+}
+async function guardarEnDrive(wb,nombre){
+  try{
+    var b64=XLSX.write(wb,{bookType:"xlsx",type:"base64"});
+    await api("guardarReporte",{nombre:nombre,base64:b64,
+      mime:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  }catch(e){}
+}
+async function guardarPdfEnDrive(doc,nombre){
+  try{
+    var b64=btoa(doc.output());
+    await api("guardarReporte",{nombre:nombre,base64:b64,mime:"application/pdf"});
+    toast("Reporte guardado también en Drive/REPORTES");
+  }catch(e){}
+}
+
+/* predefinidos */
+function repMensual(){
+  var mes=document.getElementById("mesConso").value||new Date().toISOString().slice(0,7);
+  var lista=CASOS.filter(function(c){return (c.fecha_registro||"").slice(0,7)===mes});
+  var r=resumenPorTipo(lista);
+  var texto="INFORME DE ACTUACIONES — PERÍODO "+mes+"\n\n"+
+    "Durante el período se proyectaron y tramitaron "+lista.length+" actuaciones para la "+
+    "Secretaría de Gobierno, Seguridad y Convivencia Ciudadana con Funciones de Tránsito y "+
+    "Transporte del Municipio de Obando, Valle del Cauca, discriminadas así: "+
+    r.map(function(x){return x.total+" "+x.tipo.toLowerCase()+" ("+x.notificados+" notificadas)"}).join("; ")+
+    ". Del total, "+lista.filter(function(c){return c.estado_proceso==="NOTIFICADO"}).length+
+    " actuaciones fueron notificadas por correo electrónico con constancia de Gmail, y "+
+    lista.filter(function(c){return c.estado_proceso==="ERROR"}).length+" presentaron novedades.";
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([texto],{type:"text/plain;charset=utf-8"}));
+  a.download="informe_mensual_"+mes+".txt";a.click();
+  expPDF(lista,"INFORME MENSUAL DE ACTUACIONES — "+mes,"informe_mensual_"+mes);
+}
+function repNotificaciones(){
+  var lista=filtrarCasos().filter(function(c){return c.fecha_notificacion_correo});
+  expExcel(lista,"reporte_notificaciones_"+hoyISO());
+}
+function repPendientes(){
+  var lista=CASOS.filter(function(c){return c.estado_proceso==="PROYECTADO"||c.estado_proceso==="REVISADO"});
+  expPDF(lista,"REPORTE DE PENDIENTES DE NOTIFICAR","reporte_pendientes_"+hoyISO());
+}
+function repExpediente(){
+  if(!expedienteActivo){toast("Active primero un expediente en la pestaña Casos");return}
+  var lista=filtrarCasos();
+  expPDF(lista,"REPORTE DE EXPEDIENTE","reporte_expediente_"+hoyISO());
+  expExcel(lista,"reporte_expediente_"+hoyISO());
+}
+async function correrConsistencia(){
+  document.getElementById("salidaConsistencia").textContent="Verificando...";
+  var j=await api("consistencia");
+  document.getElementById("salidaConsistencia").textContent=
+    j.ok?(j.problemas.length?j.problemas.join("\n"):"Sin inconsistencias. Todo cuadra."):j.error;
+}
+
+/* modal helpers */
+function abrirModal(html){
+  document.getElementById("modalCont").innerHTML=html;
+  document.getElementById("velo").classList.add("abierto");
+}
+function cerrarModal(){document.getElementById("velo").classList.remove("abierto")}
+</script>
+</body>
+</html>
