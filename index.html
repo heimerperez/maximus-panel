@@ -347,6 +347,7 @@ body.compacta .dato{padding:3px 0}
     <div id="listaPend"></div>
     <button class="btn primario" id="btnDespachar" onclick="despachar()">Despachar aprobados</button>
     <button class="btn" onclick="limpiarDuplicados()">Limpiar borradores duplicados</button>
+    <button class="btn" id="btnConstancias" onclick="completarConstancias()">Completar constancias faltantes</button>
   </div>
   <div class="panel">
     <h2>Posibles duplicados por resolver</h2>
@@ -1191,6 +1192,14 @@ function pintarAprobaciones(){
   pill.style.display=pend.length?"inline":"none";pill.textContent=pend.length;
   document.getElementById("btnDespachar").disabled=
     !CORREOS.some(function(c){return c.estado==="APROBADO"});
+  var faltan=CORREOS.filter(function(c){
+    if(c.estado!=="ENVIADO"||!c.id_caso)return false;
+    if(c.tipo!=="NOTIFICACION_PETICION"&&c.tipo!=="RENOTIFICACION")return false;
+    var caso=CASOS.find(function(x){return x.id_caso===c.id_caso});
+    return caso&&(caso.estado_proceso!=="NOTIFICADO"||!caso.enlace_constancia);
+  }).length;
+  var bc=document.getElementById("btnConstancias");
+  if(bc)bc.textContent="Completar constancias faltantes"+(faltan?" ("+faltan+")":"");
   document.getElementById("listaPend").innerHTML=pend.map(function(c){
     var adj=(c.adjuntos||"").split(";").filter(Boolean).map(function(id,i){
       return '<a class="enl" target="_blank" href="https://drive.google.com/file/d/'+id+'/view">Adjunto '+(i+1)+'</a>'}).join(" · ");
@@ -1239,6 +1248,16 @@ async function prepararNotif(id){
   var j=await api("prepararNotificacion",{id_caso:id});
   toast(j.ok?"Borrador creado en Aprobaciones":j.error);
   cargar(false); if(j.ok)tab("apro");
+}
+async function completarConstancias(){
+  toast("Buscando los mensajes en Gmail y generando constancias...");
+  var j=await api("completarConstancias");
+  if(j.ok){
+    toast("Constancias completadas: "+j.completadas+
+      (j.fallidas.length?" · Sin resolver: "+j.fallidas.length:""));
+    if(j.fallidas.length) console.log("Constancias fallidas:",j.fallidas);
+  }else toast(j.error);
+  cargar(false);
 }
 async function limpiarDuplicados(){
   var j=await api("limpiarDuplicados");
