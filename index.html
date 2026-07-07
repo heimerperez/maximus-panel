@@ -124,6 +124,8 @@ a.enl:hover{text-decoration:underline}
 .btn.mini.primario{background:var(--sello);border-color:var(--sello);color:#fff}
 .qa-activo{outline:2px solid var(--tinta);outline-offset:1px;opacity:1!important;box-shadow:0 0 0 3px rgba(24,36,48,.12)}
 .qa-aviso{width:100%;font-size:12px;background:var(--azul-suave);color:var(--azul);border-radius:5px;padding:5px 8px;margin-top:4px}
+.qa-cerrado{font-size:12px;background:#EDEFF2;color:var(--tinta2);border:1px dashed var(--linea);border-radius:6px;padding:7px 10px;font-weight:600}
+.qa-nota-admin{width:100%;font-size:11px;color:var(--alerta);font-weight:600;margin-top:4px}
 .mini-kpis{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .mk{border:1px solid var(--linea);border-radius:6px;padding:6px 12px;display:flex;flex-direction:column;min-width:86px}
 .mk b{font-size:17px;line-height:1.1}
@@ -201,6 +203,42 @@ body.compacta .dato{padding:3px 0}
   .det-grid{grid-template-columns:1fr}
   main{padding:10px} header .sub{display:none}
 }
+/* ---------- pulido visual ---------- */
+header{background:linear-gradient(135deg,#121C26 0%,#1B2B38 55%,#1E3D33 100%);
+  border-bottom:3px solid var(--sello)}
+header .sello{background:rgba(30,107,67,.25);border-color:#3D8A64;color:#A7D9BE;
+  box-shadow:0 0 0 1px rgba(167,217,190,.15)}
+nav{position:sticky;top:0;z-index:30;box-shadow:0 2px 8px rgba(24,36,48,.06)}
+nav button{transition:color .12s,border-color .12s}
+.panel{border:1px solid rgba(213,220,227,.7)}
+.btn{transition:transform .1s,box-shadow .12s,background .12s}
+.btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 3px 8px rgba(24,36,48,.12)}
+.btn:active:not(:disabled){transform:translateY(0)}
+.tabla thead th{position:sticky;top:0;background:var(--papel);z-index:2;
+  box-shadow:0 2px 0 var(--linea)}
+.panel.scroll{max-height:78vh;overflow:auto}
+.fila-caso{transition:background .1s}
+tr.detalle .det{animation:desplegar .18s ease-out}
+@keyframes desplegar{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.tarjeta{transition:transform .1s,border-color .12s,box-shadow .12s}
+.tarjeta:hover{transform:translateX(2px);box-shadow:0 2px 8px rgba(24,36,48,.08)}
+#toast{background:var(--tinta);border-left:4px solid var(--sello);border-radius:8px;
+  box-shadow:0 8px 30px rgba(0,0,0,.35);animation:toastIn .2s ease-out}
+@keyframes toastIn{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+.frescura{font-size:10.5px;color:#7FA890;font-weight:600;white-space:nowrap;
+  display:inline-flex;align-items:center;gap:5px}
+.frescura::before{content:"";width:7px;height:7px;border-radius:50%;background:#4CBB86;
+  box-shadow:0 0 6px rgba(76,187,134,.8);animation:latido 2.5s infinite}
+.frescura.vieja::before{background:var(--alerta);box-shadow:none;animation:none}
+@keyframes latido{0%,100%{opacity:1}50%{opacity:.45}}
+.bandeja-lista::-webkit-scrollbar,.bandeja-panel::-webkit-scrollbar,.panel.scroll::-webkit-scrollbar{width:8px;height:8px}
+.bandeja-lista::-webkit-scrollbar-thumb,.bandeja-panel::-webkit-scrollbar-thumb,.panel.scroll::-webkit-scrollbar-thumb{background:var(--linea);border-radius:4px}
+#login{background:radial-gradient(circle at 20% 20%,rgba(30,107,67,.18),transparent 45%),
+  radial-gradient(circle at 85% 80%,rgba(43,95,163,.12),transparent 40%),var(--tinta)}
+#login .caja{animation:desplegar .25s ease-out}
+h2{letter-spacing:-.01em}
+.mk{transition:border-color .12s}
+.mk:hover{border-color:var(--tinta2)}
 @media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -228,6 +266,7 @@ body.compacta .dato{padding:3px 0}
     <div class="titulo">Control de actuaciones — Obando, Valle</div>
   </div>
   <div class="der">
+    <span id="frescura" class="frescura"></span>
     <span id="sesionInfo" class="sesion-info"></span>
     <button class="btn" onclick="cargar(true)">Actualizar</button>
     <button class="btn" onclick="salir()">Cerrar sesión</button>
@@ -532,13 +571,38 @@ async function cargar(manual){
     var j=await api("getDatos");
     if(!j.ok){toast(j.error);return}
     CASOS=j.casos||[]; CORREOS=j.correos||[];
+    if(j.v!==undefined)DATA_V=j.v;
+    ULTIMA_CARGA=Date.now();
+    var fr=document.getElementById("frescura");
+    if(fr){fr.textContent="actualizado hace un instante";fr.className="frescura"}
     if(j.rol){ROL=j.rol;NOMBRE=j.nombre||NOMBRE;aplicarRol();}
     poblarLotes(); pintarCasos(); pintarCalidad(); pintarVenc(); pintarConsolidado();
     if(ROL==="admin") pintarAprobaciones();
     if(manual)toast("Datos actualizados");
   }catch(e){ if(manual)toast("Error al cargar: "+e.message) }
 }
-setInterval(function(){cargar(false)},60000);
+var DATA_V=0, ULTIMA_CARGA=0, PULSO_OCUPADO=false;
+async function pulso(){
+  if(!TOKEN||PULSO_OCUPADO||document.hidden)return;
+  PULSO_OCUPADO=true;
+  try{
+    var j=await api("version");
+    if(j.ok&&j.v!==DATA_V){await cargar(false)}
+  }catch(e){}
+  PULSO_OCUPADO=false;
+}
+setInterval(pulso,10000);                          // pulso ligero cada 10 s
+setInterval(function(){cargar(false)},180000);     // recarga completa de respaldo
+document.addEventListener("visibilitychange",function(){
+  if(!document.hidden)pulso();                     // al volver a la pestaña, al día
+});
+setInterval(function(){
+  var el=document.getElementById("frescura");
+  if(!el||!ULTIMA_CARGA)return;
+  var seg=Math.round((Date.now()-ULTIMA_CARGA)/1000);
+  el.textContent="actualizado hace "+(seg<5?"un instante":seg<60?seg+" s":Math.round(seg/60)+" min");
+  el.className="frescura"+(seg>120?" vieja":"");
+},5000);
 if(TOKEN){document.getElementById("login").style.display="none";
   document.getElementById("app").style.display="block";aplicarRol();cargar(true);}
 
@@ -833,10 +897,14 @@ function detalleCaso(c){
   var tieneBorrador=CORREOS.some(function(x){return x.id_caso===c.id_caso&&
     (x.tipo==="NOTIFICACION_PETICION"||x.tipo==="RENOTIFICACION")&&
     (x.estado==="PENDIENTE_APROBACION"||x.estado==="APROBADO")});
+  if(esPet&&c.estado_proceso!=="NOTIFICADO"&&(tieneBorrador||c.enlace_drive_pdf))
+    accAdmin.push('<button class="btn mini primario" onclick="notificarYa(\''+c.id_caso+'\')">✉️ Notificar ahora</button>');
   if(esPet&&c.enlace_drive_pdf&&!tieneBorrador&&c.estado_proceso!=="NOTIFICADO")
-    accAdmin.push('<button class="btn mini primario" onclick="prepararNotif(\''+c.id_caso+'\')">Preparar notificación</button>');
+    accAdmin.push('<button class="btn mini" onclick="prepararNotif(\''+c.id_caso+'\')">Preparar sin enviar</button>');
   if(tieneBorrador)
-    accAdmin.push('<span class="estado REVISADO" style="align-self:center">Borrador en Aprobaciones</span>');
+    accAdmin.push('<span class="estado REVISADO" style="align-self:center">Borrador en cola</span>');
+  if(esPet)
+    accAdmin.push('<button class="btn mini" onclick="consultarNotif(\''+c.id_caso+'\')">Consultar notificación</button>');
   if(esPet&&(c.estado_proceso==="REVISADO"||c.estado_proceso==="NOTIFICADO"))
     accAdmin.push('<button class="btn mini" onclick="modalRenotificar(\''+c.id_caso+'\')">Nueva notificación</button>');
   if(c.tipo_actuacion==="TUTELA"){
@@ -868,10 +936,18 @@ function detalleCaso(c){
       (activo?"disabled":"")+" onclick=\"marcarCalidad('"+c.id_caso+"','"+ver+"')\">"+
       txt+(activo?" ✓":"")+"</button>";
   }
-  var qaBtns=qbtn("APROBADO_QA","Aprobar calidad","primario")+
-    qbtn("DEVUELTO","Devolver","peligro")+
-    "<button class='btn mini' onclick=\"modalCorreccion('"+c.id_caso+"')\">Subir corrección (.docx)</button>"+
-    (qaEstado!=="PENDIENTE_QA"?"<button class='btn mini' onclick=\"marcarCalidad('"+c.id_caso+"','PENDIENTE_QA')\">Reabrir revisión</button>":"");
+  var qaCerrado = c.estado_proceso==="NOTIFICADO" && ROL!=="admin";
+  var qaBtns;
+  if(qaCerrado){
+    qaBtns="<span class='qa-cerrado'>🔒 Caso notificado: el control de calidad quedó cerrado. Solo el administrador puede reabrirlo o subir correcciones.</span>";
+  }else{
+    qaBtns=qbtn("APROBADO_QA","Aprobar calidad","primario")+
+      qbtn("DEVUELTO","Devolver","peligro")+
+      "<button class='btn mini' onclick=\"modalCorreccion('"+c.id_caso+"')\">Subir corrección (.docx)</button>"+
+      (qaEstado!=="PENDIENTE_QA"?"<button class='btn mini' onclick=\"marcarCalidad('"+c.id_caso+"','PENDIENTE_QA')\">Reabrir revisión</button>":"");
+    if(c.estado_proceso==="NOTIFICADO")
+      qaBtns+="<span class='qa-nota-admin'>Caso ya notificado — modifíquelo solo si es estrictamente necesario; quedará auditado.</span>";
+  }
   // --- Línea de progreso del caso ---
   var pasos=[["PROYECTADO","Proyectado"],["QA","Calidad"],["REVISADO","Revisado"],["NOTIFICADO","Notificado"]];
   var idxProc={PROYECTADO:0,REVISADO:2,NOTIFICADO:3,ERROR:0}[c.estado_proceso]; if(idxProc===undefined)idxProc=0;
@@ -907,8 +983,13 @@ function peticionRelacionada(tut){
 }
 async function cambiarEstado(id,estado){
   if(!estado)return;
+  var c=CASOS.find(function(x){return x.id_caso===id});
+  var antes=c?c.estado_proceso:null;
+  if(c){c.estado_proceso=estado;pintarCasos();pintarCalidad();pintarVenc();}
   var j=await api("setEstado",{id_caso:id,estado:estado});
-  toast(j.ok?"Estado actualizado a "+estado:j.error); cargar(false);
+  if(j.ok){toast("Estado: "+estado+" — "+id)}
+  else{if(c&&antes)c.estado_proceso=antes;pintarCasos();pintarCalidad();toast(j.error)}
+  cargar(false);
 }
 
 /* ------------ CONTROL DE CALIDAD ------------ */
@@ -1092,8 +1173,12 @@ function verNotas(id){
 async function guardarNota(id){
   var t=document.getElementById("notaNueva").value.trim();
   if(!t)return;
+  var c=CASOS.find(function(x){return x.id_caso===id});
+  if(c){var n=new Date().toISOString().slice(0,16).replace("T"," ")+" ("+NOMBRE+") — "+t;
+    c.notas=c.notas?c.notas+"\n"+n:n;pintarCasos();pintarCalidad();}
+  cerrarModal();
   var j=await api("addNota",{id_caso:id,texto:t});
-  toast(j.ok?"Nota guardada":j.error); cerrarModal(); cargar(false);
+  toast(j.ok?"Nota guardada":j.error); cargar(false);
 }
 
 /* expediente modal (trazabilidad) */
@@ -1278,8 +1363,57 @@ function pintarAprobaciones(){
   }).join("")||"<tr><td colspan=7 style='color:var(--tinta2);padding:16px'>Sin correos en el historial"+(qh?" para esa búsqueda":"")+".</td></tr>";
 }
 async function decidir(id,que){
+  var c=CORREOS.find(function(x){return x.id_correo===id});
+  var antes=c?c.estado:null;
+  if(c){c.estado=que==="aprobar"?"APROBADO":"RECHAZADO";c.aprobado_por=NOMBRE;pintarAprobaciones();}
   var j=await api(que==="aprobar"?"aprobarCorreo":"rechazarCorreo",{id_correo:id});
-  toast(j.ok?(que==="aprobar"?"Aprobado":"Rechazado"):j.error); cargar(false);
+  if(j.ok){toast(que==="aprobar"?"Correo aprobado":"Correo rechazado")}
+  else{if(c&&antes)c.estado=antes;pintarAprobaciones();toast(j.error)}
+  cargar(false);
+}
+async function notificarYa(id){
+  var c=CASOS.find(function(x){return x.id_caso===id});
+  var dest=c&&c.correo_notificacion?c.correo_notificacion:"el correo registrado del caso";
+  if(!confirm("Se APROBARÁ y ENVIARÁ ahora la notificación del caso "+id+" a "+dest+
+    ".\n\nSu clic constituye la aprobación (queda auditada). ¿Confirmar el envío?"))return;
+  toast("Despachando notificación... (puede tardar unos segundos)");
+  var j=await api("notificarAhora",{id_caso:id});
+  if(j.ok){
+    toast(j.constancia?"NOTIFICADO con constancia — "+id
+      :"Enviado — la constancia quedó pendiente; use Consultar notificación en un minuto");
+  }else toast(j.error);
+  cargar(false);
+}
+async function consultarNotif(id){
+  toast("Consultando estado en Gmail...");
+  var j=await api("consultarNotificacion",{id_caso:id});
+  if(!j.ok){toast(j.error);return}
+  var cab;
+  if(j.notificado){
+    cab="<p><span class='estado NOTIFICADO'>NOTIFICADO</span> el <b class='mono'>"+
+      esc((j.fecha||"").slice(0,16))+"</b>"+(j.destino?" a <b>"+esc(j.destino)+"</b>":"")+"</p>"+
+      "<div class='acciones' style='margin:8px 0'>"+
+      (j.enlace_constancia?"<a class='btn mini' target='_blank' href='"+esc(j.enlace_constancia)+"'>🧾 Constancia</a>":"")+
+      (j.enlace_gmail?"<a class='btn mini' target='_blank' href='"+esc(j.enlace_gmail)+"'>✉️ Abrir en Gmail</a>":"")+"</div>";
+  }else if(j.pendientes){
+    cab="<p><span class='estado PROYECTADO'>SIN NOTIFICAR</span> — hay "+j.pendientes+
+      " borrador(es) en cola de despacho.</p>";
+  }else{
+    cab="<p><span class='estado PROYECTADO'>SIN NOTIFICAR</span> — no se ha preparado ningún envío para este caso.</p>";
+  }
+  var lista=(j.envios||[]).map(function(e){
+    return "<li><b>"+esc(e.tipo==="RENOTIFICACION"?"Renotificación":"Notificación")+"</b> a "+
+      esc(e.destinatarios)+" — <span class='estado "+
+      (e.estado==="ENVIADO"?"NOTIFICADO":(e.estado==="RECHAZADO"||e.estado==="DESCARTADO_DUPLICADO"?"ERROR":"REVISADO"))+
+      "'>"+esc(e.estado)+"</span>"+
+      (e.fecha_envio?" · enviado "+esc((e.fecha_envio||"").slice(0,16)):"")+
+      (e.verificado_gmail?" · <b style='color:var(--sello)'>verificado en Gmail: "+esc(e.verificado_gmail)+"</b>":"")+
+      (e.motivo?" · motivo: "+esc(e.motivo):"")+"</li>";
+  }).join("");
+  abrirModal("<h2>Notificación — "+rad(id)+" <button class='cerrar' onclick='cerrarModal()'>×</button></h2>"+
+    cab+(lista?"<h3>Envíos de este caso</h3><ul style='font-size:12.5px;line-height:1.7;padding-left:18px'>"+lista+"</ul>":"")+
+    (j.reparado?"<p style='margin-top:10px;font-size:12px;background:var(--sello-suave);color:var(--sello);border-radius:6px;padding:6px 10px'>En esta consulta se completó la constancia que estaba pendiente y el caso quedó NOTIFICADO.</p>":""));
+  if(j.reparado)cargar(false);
 }
 async function prepararNotif(id){
   var j=await api("prepararNotificacion",{id_caso:id});
