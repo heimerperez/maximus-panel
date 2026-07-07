@@ -104,7 +104,7 @@ a.enl:hover{text-decoration:underline}
 .tabla-casos .chev{color:var(--sello);font-size:13px;text-align:center;user-select:none}
 .tabla-casos tr.detalle>td{padding:0;background:#F8FAFB;border-bottom:2px solid var(--sello)}
 .det{padding:16px 18px 18px}
-.det-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 22px;margin-bottom:6px}
+.det-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:6px 18px;margin-bottom:6px}
 .dato{display:flex;flex-direction:column;gap:1px;padding:5px 0;border-bottom:1px dotted var(--linea)}
 .dato .etq{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--tinta2);font-weight:700}
 .dato .val{font-size:13px;font-weight:500}
@@ -136,6 +136,21 @@ a.enl:hover{text-decoration:underline}
 .pipe .paso.actual{background:var(--tinta);color:#fff;border-color:var(--tinta)}
 .pipe .paso.malo{background:var(--rojo-suave);color:var(--rojo);border-color:var(--rojo)}
 .pipe-linea{width:16px;height:2px;background:var(--linea)}
+.chips2{display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.det-pleg{margin-top:8px;background:var(--papel);border:1px solid var(--linea);border-radius:6px}
+.det-pleg summary{cursor:pointer;padding:8px 12px;font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--tinta2);user-select:none}
+.det-pleg summary:hover{color:var(--tinta)}
+.det-pleg-cuerpo{padding:0 12px 10px;font-size:13px;line-height:1.45}
+body.compacta .tabla td{padding:4px 6px;font-size:11.5px}
+body.compacta .tabla th{padding:5px 6px;font-size:9.5px}
+body.compacta .rad{font-size:10px}
+body.compacta .estado{padding:1px 7px;font-size:10px}
+body.compacta .fila-caso small{display:none}
+body.compacta .mini-kpis .mk{padding:3px 9px;min-width:70px}
+body.compacta .mini-kpis .mk b{font-size:14px}
+body.compacta .det-grid{gap:4px 16px}
+body.compacta .dato{padding:3px 0}
 
 /* modales */
 #velo{position:fixed;inset:0;background:rgba(24,36,48,.55);display:none;align-items:flex-start;justify-content:center;padding:30px 14px;z-index:50;overflow:auto}
@@ -230,6 +245,7 @@ a.enl:hover{text-decoration:underline}
       <label>Lote<select id="fLote" onchange="pintarCasos()"><option value="">Todos</option></select></label>
       <button class="btn" onclick="modoExpediente()">Ver expediente completo</button>
       <button class="btn" onclick="limpiarFiltros()">Limpiar</button>
+      <button class="btn" id="btnDensidad" onclick="alternarDensidad()">Vista compacta</button>
     </div>
   </div>
   <div class="panel scroll">
@@ -237,10 +253,9 @@ a.enl:hover{text-decoration:underline}
     <div id="resumenFiltro" style="font-size:12px;color:var(--tinta2);margin-bottom:8px"></div>
     <table class="tabla tabla-casos" id="tablaCasos">
       <thead><tr>
-        <th style="width:26px"></th>
+        <th style="width:22px"></th>
         <th>Radicado</th><th>Peticionario / Accionante</th><th>Comparendo</th>
-        <th>Fecha</th><th>Estado</th><th>Calidad</th><th>Resultado</th>
-        <th>Notif. respuesta</th><th>Constancia</th>
+        <th>Estado / Calidad</th><th>Resultado</th><th>Notificación</th>
       </tr></thead><tbody></tbody>
     </table>
   </div>
@@ -307,6 +322,7 @@ a.enl:hover{text-decoration:underline}
     <h2>Correos pendientes de aprobación</h2>
     <div id="listaPend"></div>
     <button class="btn primario" id="btnDespachar" onclick="despachar()">Despachar aprobados</button>
+    <button class="btn" onclick="limpiarDuplicados()">Limpiar borradores duplicados</button>
   </div>
   <div class="panel">
     <h2>Posibles duplicados por resolver</h2>
@@ -570,7 +586,7 @@ function modoExpediente(){
   toast("Expediente activo. Use Limpiar para salir.");
 }
 function limpiarFiltros(){
-  expedienteActivo=null;
+  expedienteActivo=null; LIMITE_FILAS=50;
   ["fBuscar","fDesde","fHasta","fTipo","fEstado","fLote"].forEach(function(i){
     document.getElementById(i).value=""});
   pintarCasos();
@@ -587,31 +603,49 @@ function pintarCasos(){
     tb.innerHTML="<tr><td colspan=10 style='color:var(--tinta2);padding:24px'>Sin casos para los filtros actuales. Ajuste la búsqueda o registre un lote.</td></tr>";
     return;
   }
-  tb.innerHTML=lista.map(function(c){
+  var visibles = lista.slice(0, LIMITE_FILAS);
+  tb.innerHTML=visibles.map(function(c){
     var dupTag=c.estado_duplicado==="POSIBLE_DUPLICADO"||c.estado_duplicado==="DUPLICADO_CONFIRMADO"
       ?' <span class="dup">'+c.estado_duplicado.replace("_"," ")+'</span>'
       :(c.estado_duplicado==="REITERACION"?' <span class="reit">REITERACIÓN</span>':"");
     var notaTag=c.notas?' <span class="notaTag">notas</span>':"";
     var abierta=casoAbierto===c.id_caso;
-    var fNotif=(c.fecha_notificacion_correo||"").slice(0,16)||"—";
-    var constancia=c.enlace_constancia
-      ?'<a class="enl" target="_blank" href="'+esc(c.enlace_constancia)+'" onclick="event.stopPropagation()">Descargar</a>'
+    var fNotif=(c.fecha_notificacion_correo||"").slice(0,10);
+    var notif=fNotif
+      ?"<span class='mono' style='font-size:11px'>"+esc(fNotif)+"</span>"+
+        (c.enlace_constancia?" <a class='enl' target='_blank' href='"+esc(c.enlace_constancia)+
+         "' onclick='event.stopPropagation()' title='Descargar constancia'>🧾</a>":"")
       :"<span style='color:var(--tinta2)'>—</span>";
     var fila="<tr class='fila-caso"+(abierta?" abierta":"")+"' onclick=\"toggleCaso('"+c.id_caso+"')\">"+
       "<td class='chev'>"+(abierta?"▾":"▸")+"</td>"+
       "<td>"+rad(c.id_caso)+dupTag+notaTag+"</td>"+
       "<td><b>"+esc(c.accionante_peticionario)+"</b><br><small style='color:var(--tinta2)'>"+
-      esc(TIPO_TXT[c.tipo_actuacion]||c.tipo_actuacion)+(c.lote?" · "+esc(c.lote):"")+"</small></td>"+
+      esc(TIPO_TXT[c.tipo_actuacion]||c.tipo_actuacion)+" · "+esc((c.fecha_registro||"").slice(0,10))+
+      (c.lote?" · "+esc(c.lote):"")+"</small></td>"+
       "<td class='mono'>"+esc(c.comparendo||"—")+"</td>"+
-      "<td>"+esc((c.fecha_registro||"").slice(0,10))+"</td>"+
-      "<td><span class='estado "+c.estado_proceso+"'>"+esc(c.estado_proceso)+"</span></td>"+
-      "<td>"+chipQA(c)+"</td>"+
+      "<td><div class='chips2'><span class='estado "+c.estado_proceso+"'>"+esc(c.estado_proceso)+"</span>"+
+      chipQA(c)+"</div></td>"+
       "<td>"+esc(c.resultado||"—")+"</td>"+
-      "<td class='mono' style='font-size:11.5px'>"+esc(fNotif)+"</td>"+
-      "<td>"+constancia+"</td></tr>";
-    if(abierta) fila+="<tr class='detalle'><td colspan=10>"+detalleCaso(c)+"</td></tr>";
+      "<td>"+notif+"</td></tr>";
+    if(abierta) fila+="<tr class='detalle'><td colspan=7>"+detalleCaso(c)+"</td></tr>";
     return fila;
   }).join("");
+  if(lista.length>LIMITE_FILAS){
+    tb.innerHTML+="<tr><td colspan=7 style='text-align:center;padding:10px'>"+
+      "<button class='btn' onclick='LIMITE_FILAS+=50;pintarCasos()'>Mostrar más ("+
+      (lista.length-LIMITE_FILAS)+" restantes)</button></td></tr>";
+  }
+}
+var LIMITE_FILAS=50;
+function alternarDensidad(){
+  document.body.classList.toggle("compacta");
+  var on=document.body.classList.contains("compacta");
+  document.getElementById("btnDensidad").textContent=on?"Vista cómoda":"Vista compacta";
+  sessionStorage.setItem("mx_densidad",on?"1":"0");
+}
+if(sessionStorage.getItem("mx_densidad")==="1"){
+  document.body.classList.add("compacta");
+  setTimeout(function(){var b=document.getElementById("btnDensidad");if(b)b.textContent="Vista cómoda"},0);
 }
 function toggleCaso(id){
   casoAbierto = (casoAbierto===id) ? null : id;
@@ -641,8 +675,13 @@ function pintarMiniKpis(lista){
   }).join("");
 }
 function campo(etq,val,mono){
+  if(!val) return "";  // no ocupar espacio con campos vacíos
   return "<div class='dato'><span class='etq'>"+etq+"</span><span class='val"+(mono?" mono":"")+"'>"+
-    (val?esc(val):"<i style='color:var(--tinta2)'>—</i>")+"</span></div>";
+    esc(val)+"</span></div>";
+}
+function plegable(titulo,contenidoHtml,abierto){
+  return "<details class='det-pleg'"+(abierto?" open":"")+"><summary>"+titulo+
+    "</summary><div class='det-pleg-cuerpo'>"+contenidoHtml+"</div></details>";
 }
 function detalleCaso(c){
   var esPet=c.tipo_actuacion.indexOf("PETICION")===0;
@@ -665,13 +704,16 @@ function detalleCaso(c){
     "</div>";
   // --- Peticiones y observaciones ---
   var textos="";
-  if(c.resumen_peticiones) textos+="<div class='det-bloque'><h4>Peticiones</h4><p>"+esc(c.resumen_peticiones)+"</p></div>";
-  if(c.observaciones) textos+="<div class='det-bloque'><h4>Observaciones</h4><p>"+esc(c.observaciones)+"</p></div>";
-  if(c.notas) textos+="<div class='det-bloque'><h4>Notas</h4><p style='white-space:pre-wrap'>"+esc(c.notas)+"</p></div>";
+  if(c.resumen_peticiones) textos+=plegable("Peticiones","<p>"+esc(c.resumen_peticiones)+"</p>",false);
+  if(c.observaciones) textos+=plegable("Observaciones","<p>"+esc(c.observaciones)+"</p>",false);
+  if(c.notas){
+    var nNotas=c.notas.split("\n").filter(Boolean).length;
+    textos+=plegable("Notas ("+nNotas+")","<p style='white-space:pre-wrap'>"+esc(c.notas)+"</p>",false);
+  }
   if(c.historial_notificaciones){
-    var h=c.historial_notificaciones.split("|").filter(Boolean).map(function(n){
-      return "<li>"+esc(n.trim())+"</li>"}).join("");
-    textos+="<div class='det-bloque'><h4>Historial de notificaciones</h4><ul class='hist'>"+h+"</ul></div>";
+    var hs=c.historial_notificaciones.split("|").filter(Boolean);
+    textos+=plegable("Historial de notificaciones ("+hs.length+")",
+      "<ul class='hist'>"+hs.map(function(n){return "<li>"+esc(n.trim())+"</li>"}).join("")+"</ul>",false);
   }
   // --- Documentos y enlaces ---
   var docs=[];
@@ -691,6 +733,13 @@ function detalleCaso(c){
     acc.push('<button class="btn mini" onclick="verificarHash(\''+c.id_caso+'\')">Verificar integridad (hash)</button>');
   // --- Acciones solo de administrador ---
   var accAdmin=[];
+  var tieneBorrador=CORREOS.some(function(x){return x.id_caso===c.id_caso&&
+    (x.tipo==="NOTIFICACION_PETICION"||x.tipo==="RENOTIFICACION")&&
+    (x.estado==="PENDIENTE_APROBACION"||x.estado==="APROBADO")});
+  if(esPet&&c.enlace_drive_pdf&&!tieneBorrador&&c.estado_proceso!=="NOTIFICADO")
+    accAdmin.push('<button class="btn mini primario" onclick="prepararNotif(\''+c.id_caso+'\')">Preparar notificación</button>');
+  if(tieneBorrador)
+    accAdmin.push('<span class="estado REVISADO" style="align-self:center">Borrador en Aprobaciones</span>');
   if(esPet&&(c.estado_proceso==="REVISADO"||c.estado_proceso==="NOTIFICADO"))
     accAdmin.push('<button class="btn mini" onclick="modalRenotificar(\''+c.id_caso+'\')">Nueva notificación</button>');
   if(c.tipo_actuacion==="TUTELA"){
@@ -1098,7 +1147,7 @@ function pintarAprobaciones(){
   document.querySelector("#tablaHist tbody").innerHTML=hist.slice(0,100).map(function(c){
     return "<tr><td class='mono'>"+esc(c.id_correo)+"</td><td>"+(c.id_caso?rad(c.id_caso):"—")+
       "</td><td>"+esc(c.tipo)+"</td><td>"+esc(c.destinatarios)+"</td><td><span class='estado "+
-      (c.estado==="ENVIADO"?"NOTIFICADO":(c.estado==="RECHAZADO"?"ERROR":"REVISADO"))+"'>"+
+      (c.estado==="ENVIADO"?"NOTIFICADO":(c.estado==="RECHAZADO"||c.estado==="DESCARTADO_DUPLICADO"?"ERROR":"REVISADO"))+"'>"+
       esc(c.estado)+"</span></td><td>"+esc(c.aprobado_por||"—")+"</td><td>"+
       esc(c.fecha_envio||"—")+"</td></tr>";
   }).join("");
@@ -1106,6 +1155,16 @@ function pintarAprobaciones(){
 async function decidir(id,que){
   var j=await api(que==="aprobar"?"aprobarCorreo":"rechazarCorreo",{id_correo:id});
   toast(j.ok?(que==="aprobar"?"Aprobado":"Rechazado"):j.error); cargar(false);
+}
+async function prepararNotif(id){
+  var j=await api("prepararNotificacion",{id_caso:id});
+  toast(j.ok?"Borrador creado en Aprobaciones":j.error);
+  cargar(false); if(j.ok)tab("apro");
+}
+async function limpiarDuplicados(){
+  var j=await api("limpiarDuplicados");
+  toast(j.ok?("Duplicados descartados: "+j.descartados):j.error);
+  cargar(false);
 }
 async function despachar(){
   if(!confirm("¿Despachar TODOS los correos aprobados? Se enviarán inmediatamente."))return;
