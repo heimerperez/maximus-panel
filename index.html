@@ -1289,11 +1289,17 @@ async function prepararNotif(id){
 async function completarConstancias(){
   toast("Buscando los mensajes en Gmail y generando constancias...");
   var j=await api("completarConstancias");
-  if(j.ok){
-    toast("Constancias completadas: "+j.completadas+
-      (j.fallidas.length?" · Sin resolver: "+j.fallidas.length:""));
-    if(j.fallidas.length) console.log("Constancias fallidas:",j.fallidas);
-  }else toast(j.error);
+  if(!j.ok){toast(j.error);return}
+  if(j.fallidas&&j.fallidas.length){
+    abrirModal("<h2>Constancias — resultado <button class='cerrar' onclick='cerrarModal()'>×</button></h2>"+
+      "<p style='font-size:13px;margin-bottom:8px'><b>"+j.completadas+"</b> completadas correctamente. "+
+      "Los siguientes casos NO pudieron resolverse; el detalle indica la causa exacta:</p>"+
+      "<ul style='font-size:12px;line-height:1.6;padding-left:18px'>"+
+      j.fallidas.map(function(f){return "<li>"+esc(f)+"</li>"}).join("")+"</ul>"+
+      "<p style='font-size:11.5px;color:var(--tinta2);margin-top:10px'>Copie este detalle y compártalo para diagnóstico si la causa no es evidente.</p>");
+  }else{
+    toast(j.completadas?("Constancias completadas: "+j.completadas):"No había constancias pendientes");
+  }
   cargar(false);
 }
 async function limpiarDuplicados(){
