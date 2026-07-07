@@ -122,6 +122,20 @@ a.enl:hover{text-decoration:underline}
 .qa-motivo{width:100%;font-size:12px;background:var(--rojo-suave);color:var(--rojo);border-radius:5px;padding:5px 8px;margin-top:4px}
 .sesion-info{color:#9FB0C0;font-size:11.5px;font-weight:600;margin-right:4px;white-space:nowrap}
 .btn.mini.primario{background:var(--sello);border-color:var(--sello);color:#fff}
+.qa-activo{outline:2px solid var(--tinta);outline-offset:1px;opacity:1!important;box-shadow:0 0 0 3px rgba(24,36,48,.12)}
+.qa-aviso{width:100%;font-size:12px;background:var(--azul-suave);color:var(--azul);border-radius:5px;padding:5px 8px;margin-top:4px}
+.mini-kpis{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.mk{border:1px solid var(--linea);border-radius:6px;padding:6px 12px;display:flex;flex-direction:column;min-width:86px}
+.mk b{font-size:17px;line-height:1.1}
+.mk span{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--tinta2);font-weight:700}
+.mk.k-verde b{color:var(--sello)} .mk.k-rojo b{color:var(--rojo)}
+.mk.k-alerta b{color:var(--alerta)} .mk.k-azul b{color:var(--azul)}
+.pipe{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding:8px 10px;background:var(--papel);border:1px solid var(--linea);border-radius:6px}
+.pipe .paso{font-size:11px;font-weight:700;color:var(--tinta2);padding:3px 10px;border-radius:14px;border:1.5px solid var(--linea)}
+.pipe .paso.hecho{background:var(--sello-suave);color:var(--sello);border-color:var(--sello)}
+.pipe .paso.actual{background:var(--tinta);color:#fff;border-color:var(--tinta)}
+.pipe .paso.malo{background:var(--rojo-suave);color:var(--rojo);border-color:var(--rojo)}
+.pipe-linea{width:16px;height:2px;background:var(--linea)}
 
 /* modales */
 #velo{position:fixed;inset:0;background:rgba(24,36,48,.55);display:none;align-items:flex-start;justify-content:center;padding:30px 14px;z-index:50;overflow:auto}
@@ -219,12 +233,13 @@ a.enl:hover{text-decoration:underline}
     </div>
   </div>
   <div class="panel scroll">
+    <div id="miniKpis" class="mini-kpis"></div>
     <div id="resumenFiltro" style="font-size:12px;color:var(--tinta2);margin-bottom:8px"></div>
     <table class="tabla tabla-casos" id="tablaCasos">
       <thead><tr>
         <th style="width:26px"></th>
         <th>Radicado</th><th>Peticionario / Accionante</th><th>Comparendo</th>
-        <th>Fecha</th><th>Estado</th><th>Resultado</th>
+        <th>Fecha</th><th>Estado</th><th>Calidad</th><th>Resultado</th>
         <th>Notif. respuesta</th><th>Constancia</th>
       </tr></thead><tbody></tbody>
     </table>
@@ -332,6 +347,7 @@ a.enl:hover{text-decoration:underline}
           <option value="PENDIENTE">Pendientes de revisar</option>
           <option value="APROBADO_QA">Aprobados por calidad</option>
           <option value="DEVUELTO">Devueltos</option>
+          <option value="CORREGIDO">Con corrección subida</option>
           <option value="TODOS">Todos</option>
         </select>
       </label>
@@ -565,9 +581,10 @@ function pintarCasos(){
   lista.sort(function(a,b){return (b.fecha_registro||"").localeCompare(a.fecha_registro||"")});
   document.getElementById("resumenFiltro").textContent=
     (expedienteActivo?"EXPEDIENTE COMPLETO · ":"")+lista.length+" actuaciones";
+  pintarMiniKpis(lista);
   var tb=document.querySelector("#tablaCasos tbody");
   if(!lista.length){
-    tb.innerHTML="<tr><td colspan=9 style='color:var(--tinta2);padding:24px'>Sin casos para los filtros actuales. Ajuste la búsqueda o registre un lote.</td></tr>";
+    tb.innerHTML="<tr><td colspan=10 style='color:var(--tinta2);padding:24px'>Sin casos para los filtros actuales. Ajuste la búsqueda o registre un lote.</td></tr>";
     return;
   }
   tb.innerHTML=lista.map(function(c){
@@ -588,16 +605,40 @@ function pintarCasos(){
       "<td class='mono'>"+esc(c.comparendo||"—")+"</td>"+
       "<td>"+esc((c.fecha_registro||"").slice(0,10))+"</td>"+
       "<td><span class='estado "+c.estado_proceso+"'>"+esc(c.estado_proceso)+"</span></td>"+
+      "<td>"+chipQA(c)+"</td>"+
       "<td>"+esc(c.resultado||"—")+"</td>"+
       "<td class='mono' style='font-size:11.5px'>"+esc(fNotif)+"</td>"+
       "<td>"+constancia+"</td></tr>";
-    if(abierta) fila+="<tr class='detalle'><td colspan=9>"+detalleCaso(c)+"</td></tr>";
+    if(abierta) fila+="<tr class='detalle'><td colspan=10>"+detalleCaso(c)+"</td></tr>";
     return fila;
   }).join("");
 }
 function toggleCaso(id){
   casoAbierto = (casoAbierto===id) ? null : id;
-  pintarCasos();
+  pintarCasos(); pintarCalidad();
+}
+var QA_TXT={PENDIENTE_QA:"Pendiente",APROBADO_QA:"Aprobada",DEVUELTO:"Devuelto",CORREGIDO:"Corregido"};
+var QA_CLASE={PENDIENTE_QA:"PROYECTADO",APROBADO_QA:"NOTIFICADO",DEVUELTO:"ERROR",CORREGIDO:"REVISADO"};
+function chipQA(c){
+  var qa=c.calidad_estado||"PENDIENTE_QA";
+  return "<span class='estado "+(QA_CLASE[qa]||"PROYECTADO")+"' title='"+esc(c.calidad_revisor||"")+"'>"+
+    (QA_TXT[qa]||qa)+"</span>";
+}
+function pintarMiniKpis(lista){
+  var el=document.getElementById("miniKpis"); if(!el)return;
+  var n=function(f){return lista.filter(f).length};
+  var kpis=[
+    ["Total",lista.length,""],
+    ["Proyectados",n(function(c){return c.estado_proceso==="PROYECTADO"}),"k-alerta"],
+    ["Revisados",n(function(c){return c.estado_proceso==="REVISADO"}),"k-azul"],
+    ["Notificados",n(function(c){return c.estado_proceso==="NOTIFICADO"}),"k-verde"],
+    ["Calidad pendiente",n(function(c){return (c.calidad_estado||"PENDIENTE_QA")==="PENDIENTE_QA"}),"k-alerta"],
+    ["Devueltos",n(function(c){return c.calidad_estado==="DEVUELTO"}),"k-rojo"],
+    ["Correcciones subidas",n(function(c){return c.calidad_estado==="CORREGIDO"}),"k-azul"]
+  ];
+  el.innerHTML=kpis.map(function(k){
+    return "<div class='mk "+k[2]+"'><b>"+k[1]+"</b><span>"+k[0]+"</span></div>";
+  }).join("");
 }
 function campo(etq,val,mono){
   return "<div class='dato'><span class='etq'>"+etq+"</span><span class='val"+(mono?" mono":"")+"'>"+
@@ -665,18 +706,38 @@ function detalleCaso(c){
   }
   // --- Bloque de control de calidad ---
   var qaEstado=c.calidad_estado||"PENDIENTE_QA";
-  var qaTxt={PENDIENTE_QA:"Pendiente de revisar",APROBADO_QA:"Aprobado por calidad",DEVUELTO:"Devuelto para corrección"};
-  var qaClase={PENDIENTE_QA:"PROYECTADO",APROBADO_QA:"NOTIFICADO",DEVUELTO:"ERROR"};
+  var qaTxt={PENDIENTE_QA:"Pendiente de revisar",APROBADO_QA:"Aprobado por calidad",
+             DEVUELTO:"Devuelto para corrección",CORREGIDO:"Corrección subida"};
+  var qaClase={PENDIENTE_QA:"PROYECTADO",APROBADO_QA:"NOTIFICADO",DEVUELTO:"ERROR",CORREGIDO:"REVISADO"};
   var qaInfo="<div class='qa-estado'><span class='etq'>Estado de calidad</span>"+
     "<span class='estado "+(qaClase[qaEstado]||"PROYECTADO")+"'>"+(qaTxt[qaEstado]||qaEstado)+"</span>"+
     (c.calidad_revisor?" <small style='color:var(--tinta2)'>por "+esc(c.calidad_revisor)+
       (c.calidad_fecha?" · "+esc((c.calidad_fecha||"").slice(0,16)):"")+"</small>":"")+
-    (c.calidad_motivo?"<div class='qa-motivo'>Motivo de devolución: "+esc(c.calidad_motivo)+"</div>":"")+"</div>";
-  var qaBtns="<button class='btn mini primario' onclick=\"marcarCalidad('"+c.id_caso+"','APROBADO_QA')\">✓ Aprobar calidad</button>"+
-    "<button class='btn mini peligro' onclick=\"marcarCalidad('"+c.id_caso+"','DEVUELTO')\">✗ Devolver</button>"+
+    (c.calidad_motivo?"<div class='qa-motivo'>Motivo de devolución: "+esc(c.calidad_motivo)+"</div>":"")+
+    (qaEstado==="CORREGIDO"?"<div class='qa-aviso'>Hay un documento corregido en la carpeta. El PDF se regenera en el equipo principal con <b>--bajar-correcciones</b> y el caso vuelve a quedar pendiente de revisión.</div>":"")+
+    "</div>";
+  function qbtn(ver,txt,clase){
+    var activo=qaEstado===ver;
+    return "<button class='btn mini "+clase+(activo?" qa-activo":"")+"' "+
+      (activo?"disabled":"")+" onclick=\"marcarCalidad('"+c.id_caso+"','"+ver+"')\">"+
+      txt+(activo?" ✓":"")+"</button>";
+  }
+  var qaBtns=qbtn("APROBADO_QA","Aprobar calidad","primario")+
+    qbtn("DEVUELTO","Devolver","peligro")+
+    "<button class='btn mini' onclick=\"modalCorreccion('"+c.id_caso+"')\">Subir corrección (.docx)</button>"+
     (qaEstado!=="PENDIENTE_QA"?"<button class='btn mini' onclick=\"marcarCalidad('"+c.id_caso+"','PENDIENTE_QA')\">Reabrir revisión</button>":"");
+  // --- Línea de progreso del caso ---
+  var pasos=[["PROYECTADO","Proyectado"],["QA","Calidad"],["REVISADO","Revisado"],["NOTIFICADO","Notificado"]];
+  var idxProc={PROYECTADO:0,REVISADO:2,NOTIFICADO:3,ERROR:0}[c.estado_proceso]; if(idxProc===undefined)idxProc=0;
+  var idx=idxProc; if(idxProc<2 && qaEstado==="APROBADO_QA") idx=1;
+  if(c.estado_proceso==="NOTIFICADO") idx=3;
+  var pipe="<div class='pipe'>"+pasos.map(function(p,i){
+    var cls=i<idx?"hecho":(i===idx?"actual":"");
+    if(p[0]==="QA"&&qaEstado==="DEVUELTO")cls="malo";
+    return "<span class='paso "+cls+"'>"+p[1]+"</span>"+(i<pasos.length-1?"<span class='pipe-linea'></span>":"");
+  }).join("")+"</div>";
 
-  var html="<div class='det' onclick='event.stopPropagation()'>"+
+  var html="<div class='det' onclick='event.stopPropagation()'>"+pipe+
     "<div class='det-cols'>"+
       "<div class='det-col-main'>"+datos+textos+"</div>"+
     "</div>"+
@@ -705,14 +766,67 @@ async function cambiarEstado(id,estado){
 }
 
 /* ------------ CONTROL DE CALIDAD ------------ */
-async function marcarCalidad(id,veredicto){
-  var motivo="";
-  if(veredicto==="DEVUELTO"){
-    motivo=prompt("Motivo de la devolución (qué debe corregirse):","");
-    if(motivo===null)return;
+async function marcarCalidad(id,veredicto,motivo){
+  if(veredicto==="DEVUELTO"&&motivo===undefined){
+    abrirModal("<h2>Devolver para corrección — "+rad(id)+" <button class='cerrar' onclick='cerrarModal()'>×</button></h2>"+
+      "<p style='font-size:12.5px;color:var(--tinta2);margin-bottom:8px'>Indique qué debe corregirse. El motivo quedará visible en el caso y en la auditoría.</p>"+
+      "<textarea id='qaMotivo' rows=3 style='width:100%' placeholder='Ej.: corregir el número de comparendo del encabezado'></textarea>"+
+      "<div style='margin-top:10px'><button class='btn peligro' id='qaConfirmar'>Confirmar devolución</button></div>");
+    document.getElementById("qaConfirmar").onclick=function(){
+      var m=document.getElementById("qaMotivo").value.trim();
+      cerrarModal(); marcarCalidad(id,"DEVUELTO",m);
+    };
+    return;
   }
-  var j=await api("marcarCalidad",{id_caso:id,veredicto:veredicto,motivo:motivo});
-  toast(j.ok?"Veredicto registrado":j.error); cargar(false);
+  // Actualización optimista: reflejar de inmediato en pantalla
+  var c=CASOS.find(function(x){return x.id_caso===id});
+  var antes=c?{e:c.calidad_estado,r:c.calidad_revisor,f:c.calidad_fecha,m:c.calidad_motivo}:null;
+  if(c){c.calidad_estado=veredicto;c.calidad_revisor=NOMBRE;
+    c.calidad_fecha=new Date().toISOString().slice(0,16).replace("T"," ");
+    c.calidad_motivo=veredicto==="DEVUELTO"?(motivo||""):"";
+    pintarCasos();pintarCalidad();}
+  var j=await api("marcarCalidad",{id_caso:id,veredicto:veredicto,motivo:motivo||""});
+  if(j.ok){
+    var txt={APROBADO_QA:"Calidad APROBADA",DEVUELTO:"Caso DEVUELTO para corrección",PENDIENTE_QA:"Revisión reabierta"}[veredicto]||"Veredicto registrado";
+    toast(txt+" — "+id);
+  }else{
+    if(c&&antes){c.calidad_estado=antes.e;c.calidad_revisor=antes.r;c.calidad_fecha=antes.f;c.calidad_motivo=antes.m;
+      pintarCasos();pintarCalidad();}
+    toast("No se pudo registrar: "+j.error);
+  }
+  cargar(false);
+}
+function modalCorreccion(id){
+  abrirModal("<h2>Subir corrección — "+rad(id)+" <button class='cerrar' onclick='cerrarModal()'>×</button></h2>"+
+    "<p style='font-size:12.5px;color:var(--tinta2);margin-bottom:10px'>Seleccione el Word (.docx) corregido. Se guardará en la carpeta del caso en Drive como CORRECCION con fecha, quedará la nota con su nombre, y el caso pasará a «Corrección subida». El PDF definitivo se regenera después en el equipo principal para conservar el formato fiel.</p>"+
+    "<input type='file' id='archCorr' accept='.docx' style='width:100%'>"+
+    "<div style='margin-top:12px'><button class='btn primario' id='btnEnvCorr'>Subir documento</button> <span id='corrEstado' style='font-size:12px;color:var(--tinta2)'></span></div>");
+  document.getElementById("btnEnvCorr").onclick=function(){enviarCorreccion(id)};
+}
+async function enviarCorreccion(id){
+  var inp=document.getElementById("archCorr");
+  if(!inp.files.length){toast("Seleccione un archivo .docx");return}
+  var f=inp.files[0];
+  if(!/\.docx$/i.test(f.name)){toast("El archivo debe ser .docx");return}
+  if(f.size>20*1024*1024){toast("El archivo supera 20 MB");return}
+  document.getElementById("corrEstado").textContent="Subiendo...";
+  var b64=await new Promise(function(res,rej){
+    var r=new FileReader();
+    r.onload=function(){res(r.result.split(",")[1])};
+    r.onerror=function(){rej(new Error("No se pudo leer el archivo"))};
+    r.readAsDataURL(f);
+  });
+  var j=await api("subirCorreccion",{id_caso:id,nombre_archivo:f.name,base64:b64});
+  if(j.ok){
+    cerrarModal();
+    var c=CASOS.find(function(x){return x.id_caso===id});
+    if(c){c.calidad_estado="CORREGIDO";c.calidad_revisor=NOMBRE;pintarCasos();pintarCalidad();}
+    toast("Corrección subida al caso "+id);
+    cargar(false);
+  }else{
+    document.getElementById("corrEstado").textContent="";
+    toast("Error: "+j.error);
+  }
 }
 function pintarCalidad(){
   var sec=document.getElementById("t-calidad");
@@ -724,6 +838,7 @@ function pintarCalidad(){
     if(modo==="PENDIENTE"&&qa!=="PENDIENTE_QA")return false;
     if(modo==="APROBADO_QA"&&qa!=="APROBADO_QA")return false;
     if(modo==="DEVUELTO"&&qa!=="DEVUELTO")return false;
+    if(modo==="CORREGIDO"&&qa!=="CORREGIDO")return false;
     if(q){
       var blob=norm([c.id_caso,c.accionante_peticionario,c.comparendo].join(" "));
       if(blob.indexOf(q)<0)return false;
@@ -736,8 +851,7 @@ function pintarCalidad(){
   if(pill){pill.style.display=pend?"inline":"none";pill.textContent=pend;}
   var rc=document.getElementById("resumenCalidad");
   if(rc) rc.textContent=lista.length+" casos · "+pend+" pendientes de revisar en total";
-  var qaTxt={PENDIENTE_QA:"Pendiente",APROBADO_QA:"Aprobado",DEVUELTO:"Devuelto"};
-  var qaClase={PENDIENTE_QA:"PROYECTADO",APROBADO_QA:"NOTIFICADO",DEVUELTO:"ERROR"};
+  var qaTxt=QA_TXT, qaClase=QA_CLASE;
   var tb=document.querySelector("#tablaCalidad tbody");
   if(!lista.length){tb.innerHTML="<tr><td colspan=7 style='color:var(--tinta2);padding:20px'>No hay casos para este filtro.</td></tr>";return}
   tb.innerHTML=lista.map(function(c){
