@@ -738,7 +738,13 @@ body.compacta .dato { padding: 3px 0; }
   background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:10px;padding:1px 8px}
 .grupo-bandeja{display:flex;align-items:center;font-size:11px;font-weight:800;
   text-transform:uppercase;letter-spacing:.05em;color:var(--txt-secondary);
-  margin:10px 2px 6px;padding-top:4px}
+  margin:10px 2px 6px;padding:6px 4px;border-radius:6px;cursor:pointer;user-select:none}
+.grupo-bandeja:hover{background:var(--bg-hover)}
+.grupo-bandeja.cerrado{opacity:.75}
+.gt-chev{width:14px;font-size:11px;color:var(--accent);margin-right:2px}
+.grupo-tipo{cursor:pointer;user-select:none}
+.grupo-tipo:hover td{background:var(--bg-active)!important}
+.grupo-tipo .gt-chev{margin-right:6px;color:var(--accent);font-size:11px}
 
 /* Login más legible manteniendo el vidrio */
 #login .caja{background:rgba(255,255,255,.08)}
@@ -1273,10 +1279,13 @@ function pintarCasos(){
   };
   if(AGRUPAR_TIPO){
     tb.innerHTML=agruparPorTipo(visibles).map(function(g){
-      return "<tr class='grupo-tipo'><td colspan=7><span class='gt-banda "+(CLASE_TIPO[g.tipo]||"pg")+
+      var cerrado=GRUPOS_CERRADOS.has(g.tipo);
+      return "<tr class='grupo-tipo"+(cerrado?" cerrado":"")+"' onclick=\"toggleGrupo('"+g.tipo+"')\">"+
+        "<td colspan=7><span class='gt-chev'>"+(cerrado?"▸":"▾")+"</span>"+
+        "<span class='gt-banda "+(CLASE_TIPO[g.tipo]||"pg")+
         "'></span><b>"+esc(TIPO_TXT[g.tipo]||g.tipo)+"</b><span class='gt-n'>"+g.casos.length+
         (g.casos.length===1?" caso":" casos")+"</span></td></tr>"+
-        g.casos.map(filaDe).join("");
+        (cerrado?"":g.casos.map(filaDe).join(""));
     }).join("");
   }else{
     tb.innerHTML=visibles.map(filaDe).join("");
@@ -1309,6 +1318,12 @@ function agruparPorTipo(lista){
   return tipos.map(function(t){return {tipo:t,casos:grupos[t]}});
 }
 var CLASE_TIPO={PETICION_GENERAL:"pg",PETICION_COMPARENDO:"pc",TUTELA:"tu",RECURSO_REPOSICION:"rr"};
+var GRUPOS_CERRADOS=new Set(JSON.parse(sessionStorage.getItem("mx_grupos_cerrados")||"[]"));
+function toggleGrupo(tipo){
+  if(GRUPOS_CERRADOS.has(tipo))GRUPOS_CERRADOS.delete(tipo);else GRUPOS_CERRADOS.add(tipo);
+  sessionStorage.setItem("mx_grupos_cerrados",JSON.stringify(Array.from(GRUPOS_CERRADOS)));
+  pintarCasos();
+}
 var BANDEJA_SEL=null, BANDEJA_IDS=[];
 function alternarVista(){
   MODO_VISTA = MODO_VISTA==="tabla" ? "bandeja" : "tabla";
@@ -1341,9 +1356,12 @@ function pintarBandeja(lista){
   var htmlLista;
   if(AGRUPAR_TIPO){
     htmlLista=agruparPorTipo(visibles).map(function(g){
-      return "<div class='grupo-bandeja'><span class='gt-banda "+(CLASE_TIPO[g.tipo]||"pg")+
+      var cerrado=GRUPOS_CERRADOS.has(g.tipo);
+      return "<div class='grupo-bandeja"+(cerrado?" cerrado":"")+"' onclick=\"toggleGrupo('"+g.tipo+"')\">"+
+        "<span class='gt-chev'>"+(cerrado?"▸":"▾")+"</span>"+
+        "<span class='gt-banda "+(CLASE_TIPO[g.tipo]||"pg")+
         "'></span>"+esc(TIPO_TXT[g.tipo]||g.tipo)+" <span class='gt-n'>"+g.casos.length+"</span></div>"+
-        g.casos.map(tarjetaDe).join("");
+        (cerrado?"":g.casos.map(tarjetaDe).join(""));
     }).join("");
   }else{
     htmlLista=visibles.map(tarjetaDe).join("");
