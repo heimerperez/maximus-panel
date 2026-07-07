@@ -168,6 +168,16 @@ body.compacta .dato{padding:3px 0}
   position:sticky;top:0;z-index:2}
 .bp-pos{font-size:11.5px;font-weight:700;color:var(--tinta2)}
 .bp-titulo{padding:10px 16px 0;font-size:14px}
+.apro-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.apro-resumen{display:flex;gap:6px;flex-wrap:wrap}
+.cp-cab{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.cp-tipo{background:var(--tinta);color:#fff;font-size:10px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;padding:3px 8px;border-radius:4px}
+.cp-fecha{margin-left:auto;font-size:11px;color:var(--tinta2)}
+.cp-datos{font-size:12.5px;line-height:1.6;border-left:3px solid var(--linea);padding-left:10px;margin-bottom:6px}
+.cp-datos .etq{display:inline-block;min-width:52px;font-size:10px;text-transform:uppercase;
+  letter-spacing:.05em;color:var(--tinta2);font-weight:700}
+.cp-botones{margin-top:10px;padding-top:10px;border-top:1px solid var(--linea)}
 @media(max-width:900px){.bandeja-cont{grid-template-columns:1fr}
   .bandeja-lista{max-height:34vh}.bandeja-panel{position:static}}
 
@@ -343,20 +353,27 @@ body.compacta .dato{padding:3px 0}
 <!-- ---------- APROBACIONES ---------- -->
 <section id="t-apro" style="display:none">
   <div class="panel">
-    <h2>Correos pendientes de aprobación</h2>
+    <div class="apro-cab">
+      <h2 style="margin-bottom:0">Bandeja de aprobaciones</h2>
+      <div id="aproResumen" class="apro-resumen"></div>
+    </div>
+    <div class="acciones" style="margin:10px 0 14px">
+      <button class="btn primario" id="btnDespachar" onclick="despachar()">Despachar aprobados</button>
+      <button class="btn" onclick="limpiarDuplicados()">Limpiar borradores duplicados</button>
+      <button class="btn" id="btnConstancias" onclick="completarConstancias()">Completar constancias faltantes</button>
+    </div>
     <div id="listaPend"></div>
-    <button class="btn primario" id="btnDespachar" onclick="despachar()">Despachar aprobados</button>
-    <button class="btn" onclick="limpiarDuplicados()">Limpiar borradores duplicados</button>
-    <button class="btn" id="btnConstancias" onclick="completarConstancias()">Completar constancias faltantes</button>
   </div>
   <div class="panel">
     <h2>Posibles duplicados por resolver</h2>
     <div id="listaDup"></div>
   </div>
   <div class="panel scroll">
-    <h2>Historial de correos</h2>
-    <table class="tabla" id="tablaHist"><thead><tr>
-      <th>Id correo</th><th>Caso</th><th>Tipo</th><th>Destinatario</th>
+    <div class="apro-cab"><h2 style="margin-bottom:0">Historial de correos</h2>
+      <input id="fHist" oninput="pintarAprobaciones()" placeholder="Buscar en el historial..." style="min-width:220px">
+    </div>
+    <table class="tabla" id="tablaHist" style="margin-top:10px"><thead><tr>
+      <th>Fecha</th><th>Caso</th><th>Tipo</th><th>Destinatario</th>
       <th>Estado</th><th>Aprobó</th><th>Envío</th>
     </tr></thead><tbody></tbody></table>
   </div>
@@ -1200,17 +1217,33 @@ function pintarAprobaciones(){
   }).length;
   var bc=document.getElementById("btnConstancias");
   if(bc)bc.textContent="Completar constancias faltantes"+(faltan?" ("+faltan+")":"");
+  var aprobados=CORREOS.filter(function(c){return c.estado==="APROBADO"}).length;
+  var res=document.getElementById("aproResumen");
+  if(res)res.innerHTML="<span class='estado PROYECTADO'>"+pend.length+" por aprobar</span> "+
+    "<span class='estado REVISADO'>"+aprobados+" aprobados sin despachar</span>";
+  var TIPO_CORREO={NOTIFICACION_PETICION:"Notificación",RENOTIFICACION:"Renotificación",
+    RESUMEN_DIARIO:"Resumen diario",RESULTADO_LOTE:"Resultado de lote",CONSOLIDADO_MENSUAL:"Consolidado"};
   document.getElementById("listaPend").innerHTML=pend.map(function(c){
-    var adj=(c.adjuntos||"").split(";").filter(Boolean).map(function(id,i){
-      return '<a class="enl" target="_blank" href="https://drive.google.com/file/d/'+id+'/view">Adjunto '+(i+1)+'</a>'}).join(" · ");
-    return "<div class='correoPrev'><div class='meta'><b>"+esc(c.tipo)+"</b> · "+esc(c.id_correo)+
-      (c.id_caso?" · "+rad(c.id_caso):"")+"<br>Para: <b>"+esc(c.destinatarios)+"</b>"+
-      (c.motivo?" · Motivo: "+esc(c.motivo):"")+"<br>Asunto: "+esc(c.asunto)+"</div>"+
-      (adj?"<div style='font-size:12px;margin-bottom:6px'>Adjuntos: "+adj+"</div>":"")+
-      "<div class='cuerpo'>"+c.cuerpo_html+"</div>"+
-      "<div class='acciones' style='margin-top:8px'>"+
-      "<button class='btn primario mini' onclick=\"decidir('"+c.id_correo+"','aprobar')\">Aprobar</button>"+
-      "<button class='btn peligro mini' onclick=\"decidir('"+c.id_correo+"','rechazar')\">Rechazar</button>"+
+    var caso=CASOS.find(function(x){return x.id_caso===c.id_caso});
+    var adj=(c.adjuntos||"").split(";").filter(Boolean);
+    var adjHtml=adj.map(function(id,i){
+      return '<a class="btn mini" target="_blank" href="https://drive.google.com/file/d/'+id+'/view">📎 Adjunto '+(i+1)+'</a>'}).join("");
+    return "<div class='correoPrev'>"+
+      "<div class='cp-cab'><span class='cp-tipo'>"+esc(TIPO_CORREO[c.tipo]||c.tipo)+"</span>"+
+      (c.id_caso?rad(c.id_caso):"")+
+      (caso?"<b style='font-size:13px'>"+esc(caso.accionante_peticionario)+"</b>":"")+
+      "<span class='cp-fecha mono'>"+esc((c.fecha_preparacion||"").slice(0,16))+"</span></div>"+
+      "<div class='cp-datos'>"+
+      "<div><span class='etq'>De</span> Secretaría de Gobierno, Seguridad y Convivencia Ciudadana con Funciones de Tránsito y Transporte del Municipio de Obando, Valle del Cauca</div>"+
+      "<div><span class='etq'>Para</span> <b>"+esc(c.destinatarios)+"</b></div>"+
+      "<div><span class='etq'>Asunto</span> "+esc(c.asunto)+"</div>"+
+      (c.motivo?"<div><span class='etq'>Motivo</span> "+esc(c.motivo)+"</div>":"")+
+      "</div>"+
+      plegable("Ver contenido del correo","<div class='cuerpo'>"+c.cuerpo_html+"</div>",false)+
+      (adjHtml?"<div class='acciones' style='margin-top:8px'>"+adjHtml+"</div>":"")+
+      "<div class='acciones cp-botones'>"+
+      "<button class='btn primario' onclick=\"decidir('"+c.id_correo+"','aprobar')\">✓ Aprobar</button>"+
+      "<button class='btn peligro' onclick=\"decidir('"+c.id_correo+"','rechazar')\">✗ Rechazar</button>"+
       "</div></div>";
   }).join("")||"<p style='color:var(--tinta2)'>No hay correos pendientes de aprobación.</p>";
 
@@ -1231,14 +1264,18 @@ function pintarAprobaciones(){
   }).join("")||"<p style='color:var(--tinta2)'>No hay posibles duplicados pendientes de decisión.</p>";
 
   var hist=CORREOS.filter(function(c){return c.estado!=="PENDIENTE_APROBACION"});
+  var qh=norm((document.getElementById("fHist")||{}).value||"");
+  if(qh)hist=hist.filter(function(c){
+    return norm([c.id_correo,c.id_caso,c.tipo,c.destinatarios,c.estado,c.aprobado_por].join(" ")).indexOf(qh)>=0});
   hist.sort(function(a,b){return (b.fecha_preparacion||"").localeCompare(a.fecha_preparacion||"")});
   document.querySelector("#tablaHist tbody").innerHTML=hist.slice(0,100).map(function(c){
-    return "<tr><td class='mono'>"+esc(c.id_correo)+"</td><td>"+(c.id_caso?rad(c.id_caso):"—")+
+    return "<tr><td class='mono' style='font-size:11px'>"+esc((c.fecha_preparacion||"").slice(0,16))+
+      "</td><td>"+(c.id_caso?rad(c.id_caso):"—")+
       "</td><td>"+esc(c.tipo)+"</td><td>"+esc(c.destinatarios)+"</td><td><span class='estado "+
       (c.estado==="ENVIADO"?"NOTIFICADO":(c.estado==="RECHAZADO"||c.estado==="DESCARTADO_DUPLICADO"?"ERROR":"REVISADO"))+"'>"+
-      esc(c.estado)+"</span></td><td>"+esc(c.aprobado_por||"—")+"</td><td>"+
-      esc(c.fecha_envio||"—")+"</td></tr>";
-  }).join("");
+      esc(c.estado)+"</span></td><td>"+esc(c.aprobado_por||"—")+"</td><td class='mono' style='font-size:11px'>"+
+      esc((c.fecha_envio||"—").slice(0,16))+"</td></tr>";
+  }).join("")||"<tr><td colspan=7 style='color:var(--tinta2);padding:16px'>Sin correos en el historial"+(qh?" para esa búsqueda":"")+".</td></tr>";
 }
 async function decidir(id,que){
   var j=await api(que==="aprobar"?"aprobarCorreo":"rechazarCorreo",{id_correo:id});
