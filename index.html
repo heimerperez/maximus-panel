@@ -725,7 +725,52 @@ body.compacta .dato { padding: 3px 0; }
 
 @keyframes desplegar{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 
-@keyframes latido{0%,100%{opacity:1}50%{opacity:.45}}</style>
+@keyframes latido{0%,100%{opacity:1}50%{opacity:.45}}
+/* ===== AJUSTES DE USABILIDAD (sobre el diseño base) ===== */
+/* Agrupación por tipo */
+.grupo-tipo td{background:var(--bg-sunken)!important;padding:8px 12px!important;
+  font-size:12px;border-bottom:1px solid var(--border-default)!important}
+.grupo-tipo b{letter-spacing:.02em}
+.gt-banda{display:inline-block;width:4px;height:14px;border-radius:2px;margin-right:8px;vertical-align:-2px}
+.gt-banda.pg{background:var(--c-pg)}.gt-banda.pc{background:var(--c-pc)}
+.gt-banda.tu{background:var(--c-tu)}.gt-banda.rr{background:var(--c-rr)}
+.gt-n{margin-left:8px;font-size:10.5px;font-weight:700;color:var(--txt-tertiary);
+  background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:10px;padding:1px 8px}
+.grupo-bandeja{display:flex;align-items:center;font-size:11px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--txt-secondary);
+  margin:10px 2px 6px;padding-top:4px}
+
+/* Login más legible manteniendo el vidrio */
+#login .caja{background:rgba(255,255,255,.08)}
+#login input{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28);color:#F9FAFB}
+#login input::placeholder{color:rgba(249,250,251,.6)}
+#login input:focus{background:rgba(255,255,255,.16);border-color:var(--accent)}
+
+/* Pestañas inactivas con más contraste */
+nav button{color:var(--txt-secondary)}
+nav button.activo{color:var(--accent-dark)}
+
+/* Chips dobles: punto de color solo en el estado del proceso */
+.chips2 .estado:nth-child(2)::before{display:none}
+.chips2 .estado:nth-child(2){padding-left:10px}
+
+/* Animaciones continuas: pausa en móvil y en segundo plano */
+@media(max-width:760px){
+  #login::before{animation:none!important}
+  header::before,header::after{animation:none!important}
+}
+body.pausado #login::before,body.pausado header::before,body.pausado header::after{
+  animation-play-state:paused!important}
+
+/* Objetivos táctiles cómodos en pantallas de dedo */
+@media(pointer:coarse){
+  .btn{padding:10px 16px}
+  .btn.mini{padding:9px 13px;font-size:12px}
+  nav button{padding:15px 16px}
+  .fila-caso td{padding-top:10px;padding-bottom:10px}
+  .tarjeta{padding:14px}
+}
+</style>
 </head>
 <body>
 
@@ -800,6 +845,7 @@ body.compacta .dato { padding: 3px 0; }
       <button class="btn" onclick="limpiarFiltros()">Limpiar</button>
       <button class="btn" id="btnDensidad" onclick="alternarDensidad()">Vista compacta</button>
       <button class="btn" id="btnVista" onclick="alternarVista()">Vista bandeja</button>
+      <button class="btn" id="btnAgrupar" onclick="alternarAgrupacion()">Agrupar por tipo</button>
     </div>
   </div>
   <div class="panel scroll">
@@ -1079,6 +1125,7 @@ async function pulso(){
 setInterval(pulso,10000);                          // pulso ligero cada 10 s
 setInterval(function(){cargar(false)},180000);     // recarga completa de respaldo
 document.addEventListener("visibilitychange",function(){
+  document.body.classList.toggle("pausado",document.hidden);
   if(!document.hidden)pulso();                     // al volver a la pestaña, al día
 });
 setInterval(function(){
@@ -1198,7 +1245,7 @@ function pintarCasos(){
     return;
   }
   var visibles = lista.slice(0, LIMITE_FILAS);
-  tb.innerHTML=visibles.map(function(c){
+  var filaDe=function(c){
     var dupTag=c.estado_duplicado==="POSIBLE_DUPLICADO"||c.estado_duplicado==="DUPLICADO_CONFIRMADO"
       ?' <span class="dup">'+c.estado_duplicado.replace("_"," ")+'</span>'
       :(c.estado_duplicado==="REITERACION"?' <span class="reit">REITERACIÓN</span>':"");
@@ -1223,7 +1270,17 @@ function pintarCasos(){
       "<td>"+notif+"</td></tr>";
     if(abierta) fila+="<tr class='detalle'><td colspan=7>"+detalleCaso(c)+"</td></tr>";
     return fila;
-  }).join("");
+  };
+  if(AGRUPAR_TIPO){
+    tb.innerHTML=agruparPorTipo(visibles).map(function(g){
+      return "<tr class='grupo-tipo'><td colspan=7><span class='gt-banda "+(CLASE_TIPO[g.tipo]||"pg")+
+        "'></span><b>"+esc(TIPO_TXT[g.tipo]||g.tipo)+"</b><span class='gt-n'>"+g.casos.length+
+        (g.casos.length===1?" caso":" casos")+"</span></td></tr>"+
+        g.casos.map(filaDe).join("");
+    }).join("");
+  }else{
+    tb.innerHTML=visibles.map(filaDe).join("");
+  }
   if(lista.length>LIMITE_FILAS){
     tb.innerHTML+="<tr><td colspan=7 style='text-align:center;padding:10px'>"+
       "<button class='btn' onclick='LIMITE_FILAS+=50;pintarCasos()'>Mostrar más ("+
@@ -1232,6 +1289,26 @@ function pintarCasos(){
 }
 var LIMITE_FILAS=50;
 var MODO_VISTA=sessionStorage.getItem("mx_vista")||"tabla";
+var AGRUPAR_TIPO=sessionStorage.getItem("mx_agrupar")==="1";
+var ORDEN_TIPOS=["PETICION_GENERAL","PETICION_COMPARENDO","TUTELA","RECURSO_REPOSICION"];
+function alternarAgrupacion(){
+  AGRUPAR_TIPO=!AGRUPAR_TIPO;
+  sessionStorage.setItem("mx_agrupar",AGRUPAR_TIPO?"1":"0");
+  actualizarBotonAgrupar(); pintarCasos();
+}
+function actualizarBotonAgrupar(){
+  var b=document.getElementById("btnAgrupar");
+  if(b)b.textContent=AGRUPAR_TIPO?"Sin agrupar":"Agrupar por tipo";
+}
+setTimeout(actualizarBotonAgrupar,0);
+function agruparPorTipo(lista){
+  var grupos={};
+  lista.forEach(function(c){(grupos[c.tipo_actuacion]=grupos[c.tipo_actuacion]||[]).push(c)});
+  var tipos=ORDEN_TIPOS.filter(function(t){return grupos[t]});
+  Object.keys(grupos).forEach(function(t){if(tipos.indexOf(t)<0)tipos.push(t)});
+  return tipos.map(function(t){return {tipo:t,casos:grupos[t]}});
+}
+var CLASE_TIPO={PETICION_GENERAL:"pg",PETICION_COMPARENDO:"pc",TUTELA:"tu",RECURSO_REPOSICION:"rr"};
 var BANDEJA_SEL=null, BANDEJA_IDS=[];
 function alternarVista(){
   MODO_VISTA = MODO_VISTA==="tabla" ? "bandeja" : "tabla";
@@ -1250,7 +1327,7 @@ function pintarBandeja(lista){
   if(BANDEJA_SEL&&BANDEJA_IDS.indexOf(BANDEJA_SEL)<0) BANDEJA_SEL=null;
   if(!BANDEJA_SEL&&BANDEJA_IDS.length) BANDEJA_SEL=BANDEJA_IDS[0];
   var visibles=lista.slice(0,LIMITE_FILAS);
-  document.getElementById("bandejaLista").innerHTML=visibles.map(function(c){
+  var tarjetaDe=function(c){
     var sel=c.id_caso===BANDEJA_SEL;
     return "<div class='tarjeta"+(sel?" sel":"")+"' onclick=\"seleccionarCaso('"+c.id_caso+"')\">"+
       "<div class='tj-linea1'>"+rad(c.id_caso)+
@@ -1260,7 +1337,18 @@ function pintarBandeja(lista){
       "<div class='tj-sub'>"+esc(TIPO_TXT[c.tipo_actuacion]||"")+
       (c.comparendo?" · "+esc(c.comparendo):"")+" · "+esc((c.fecha_registro||"").slice(0,10))+"</div>"+
       "</div>";
-  }).join("")+(lista.length>LIMITE_FILAS?
+  };
+  var htmlLista;
+  if(AGRUPAR_TIPO){
+    htmlLista=agruparPorTipo(visibles).map(function(g){
+      return "<div class='grupo-bandeja'><span class='gt-banda "+(CLASE_TIPO[g.tipo]||"pg")+
+        "'></span>"+esc(TIPO_TXT[g.tipo]||g.tipo)+" <span class='gt-n'>"+g.casos.length+"</span></div>"+
+        g.casos.map(tarjetaDe).join("");
+    }).join("");
+  }else{
+    htmlLista=visibles.map(tarjetaDe).join("");
+  }
+  document.getElementById("bandejaLista").innerHTML=htmlLista+(lista.length>LIMITE_FILAS?
     "<button class='btn' style='width:100%;margin-top:6px' onclick='LIMITE_FILAS+=50;pintarCasos()'>Mostrar más ("+(lista.length-LIMITE_FILAS)+")</button>":"");
   pintarPanelBandeja(lista);
 }
