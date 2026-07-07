@@ -5,23 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MAXIMUS CONTROL — Secretaría de Tránsito de Obando</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Libre+Franklin:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
 :root{
-  --archivo:#EDF0F3; --papel:#FFFFFF; --tinta:#182430; --tinta2:#48586A;
-  --linea:#D5DCE3; --sello:#1E6B43; --sello-suave:#E4F1E9;
-  --alerta:#B07A1E; --alerta-suave:#F7EDD8; --rojo:#A8322D; --rojo-suave:#F6E3E2;
-  --azul:#2B5FA3; --azul-suave:#E3EBF6;
-  --pg:#3A7CA5; --pc:#16425B; --tu:#7A3E9D; --rr:#8A6D1D;
-  --radio:8px; --sombra:0 1px 3px rgba(24,36,48,.10),0 4px 14px rgba(24,36,48,.06);
+  --archivo:#F0F2F5; --papel:#FFFFFF; --tinta:#111827; --tinta2:#4B5563;
+  --terciario:#9CA3AF;
+  --linea:#E5E7EB; --sello:#059669; --sello-suave:#D1FAE5; --sello-oscuro:#047857;
+  --alerta:#D97706; --alerta-suave:#FEF3C7; --rojo:#DC2626; --rojo-suave:#FEE2E2;
+  --azul:#2563EB; --azul-suave:#DBEAFE;
+  --pg:#0284C7; --pc:#0F766E; --tu:#9333EA; --rr:#B45309;
+  --radio:14px; --r-sm:6px; --r-md:10px;
+  --sombra:0 2px 8px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --sombra-lg:0 8px 24px rgba(0,0,0,.08),0 2px 6px rgba(0,0,0,.04);
+  --ease:cubic-bezier(.4,0,.2,1);
 }
 *{box-sizing:border-box;margin:0}
 html,body{height:100%}
-body{font-family:'Libre Franklin',system-ui,sans-serif;background:var(--archivo);color:var(--tinta);font-size:14px}
+body{font-family:'Inter','Libre Franklin',system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:var(--archivo);color:var(--tinta);font-size:14px}
 .mono{font-family:'IBM Plex Mono',monospace}
 button{font-family:inherit;cursor:pointer;border:none;background:none}
 input,select,textarea{font-family:inherit;font-size:13px;padding:7px 9px;border:1px solid var(--linea);border-radius:6px;background:var(--papel);color:var(--tinta)}
@@ -29,7 +33,9 @@ input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid v
 
 /* ---------- Login ---------- */
 #login{position:fixed;inset:0;background:var(--tinta);display:flex;align-items:center;justify-content:center;padding:16px;z-index:100}
-#login .caja{background:var(--papel);border-radius:12px;padding:34px 30px;max-width:390px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.4)}
+#login .caja{background:rgba(255,255,255,.97);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);
+  border:1px solid rgba(255,255,255,.2);border-radius:20px;padding:40px 36px;max-width:420px;width:100%;
+  box-shadow:0 16px 48px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.4)}
 #login .marca{font-family:'IBM Plex Mono',monospace;font-weight:600;letter-spacing:.18em;font-size:12px;color:var(--sello);border:1.5px solid var(--sello);display:inline-block;padding:5px 10px;border-radius:4px;transform:rotate(-1.2deg)}
 #login h1{font-size:21px;font-weight:800;margin:16px 0 4px}
 #login p{color:var(--tinta2);font-size:12.5px;line-height:1.5;margin-bottom:18px}
@@ -44,27 +50,27 @@ header .sello{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacin
 header .titulo{font-weight:700;font-size:15px}
 header .sub{font-size:11px;color:#9FB0C0;width:100%;max-width:640px;line-height:1.35}
 header .der{margin-left:auto;display:flex;gap:8px;align-items:center}
-.btn{padding:7px 12px;border-radius:6px;font-weight:600;font-size:12.5px;border:1px solid var(--linea);background:var(--papel);color:var(--tinta)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--r-sm);font-weight:600;font-size:12.5px;border:1.5px solid #D1D5DB;background:var(--papel);color:var(--tinta);white-space:nowrap}
 .btn.primario{background:var(--sello);border-color:var(--sello);color:#fff}
 .btn.peligro{background:var(--rojo);border-color:var(--rojo);color:#fff}
-.btn.mini{padding:4px 8px;font-size:11.5px}
+.btn.mini{padding:5px 10px;font-size:11.5px}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 header .btn{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.25);color:#fff}
 
-nav{display:flex;gap:2px;background:var(--papel);border-bottom:2px solid var(--linea);padding:0 12px;overflow-x:auto}
-nav button{padding:12px 14px;font-weight:600;font-size:13px;color:var(--tinta2);border-bottom:3px solid transparent;white-space:nowrap}
-nav button.activo{color:var(--tinta);border-bottom-color:var(--sello)}
+nav{display:flex;gap:0;background:var(--papel);border-bottom:1px solid var(--linea);padding:0 16px;overflow-x:auto}
+nav button{padding:13px 16px;font-weight:600;font-size:13px;color:var(--terciario);border-bottom:2.5px solid transparent;white-space:nowrap}
+nav button.activo{color:var(--sello-oscuro);border-bottom-color:var(--sello)}
 nav button .pill{background:var(--rojo);color:#fff;border-radius:9px;font-size:10.5px;padding:1px 6px;margin-left:4px}
 
 main{padding:16px;max-width:1340px;margin:0 auto}
-.panel{background:var(--papel);border-radius:var(--radio);box-shadow:var(--sombra);padding:16px;margin-bottom:16px}
+.panel{background:var(--papel);border-radius:var(--radio);box-shadow:var(--sombra);padding:20px;margin-bottom:16px}
 .filtros{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
 .filtros label{display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:600;color:var(--tinta2)}
 h2{font-size:16px;font-weight:800;margin-bottom:12px}
 h3{font-size:13.5px;font-weight:700;margin:14px 0 8px}
 
 /* radicado chip — firma visual */
-.rad{font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;display:inline-flex;align-items:center;border:1px solid var(--linea);border-radius:4px;overflow:hidden;white-space:nowrap}
+.rad{font-family:'IBM Plex Mono',monospace;font-size:11.5px;font-weight:600;display:inline-flex;align-items:center;border:1.5px solid #D1D5DB;border-radius:var(--r-sm);overflow:hidden;white-space:nowrap;background:var(--papel)}
 .rad i{width:5px;align-self:stretch;display:block}
 .rad span{padding:3px 7px}
 .rad.PG i{background:var(--pg)} .rad.PC i{background:var(--pc)}
@@ -74,7 +80,7 @@ h3{font-size:13.5px;font-weight:700;margin:14px 0 8px}
 .tabla th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--tinta2);padding:8px 8px;border-bottom:2px solid var(--linea);white-space:nowrap}
 .tabla td{padding:8px;border-bottom:1px solid var(--linea);vertical-align:top}
 .scroll{overflow-x:auto}
-.estado{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.estado{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.01em}
 .PROYECTADO{background:var(--alerta-suave);color:var(--alerta)}
 .REVISADO{background:var(--azul-suave);color:var(--azul)}
 .NOTIFICADO{background:var(--sello-suave);color:var(--sello)}
@@ -87,7 +93,7 @@ a.enl:hover{text-decoration:underline}
 .notaTag{background:#FFF6D9;border:1px solid #E8D48A;border-radius:4px;font-size:10.5px;padding:1px 6px;font-weight:700;color:#7A621A}
 
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
-.kpi{background:var(--papel);border:1px solid var(--linea);border-radius:var(--radio);padding:12px}
+.kpi{background:var(--papel);border:1px solid var(--linea);border-radius:var(--r-md);padding:14px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
 .kpi b{display:block;font-size:24px;font-weight:800}
 .kpi small{color:var(--tinta2);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
 .kpi .delta{font-size:11.5px;font-weight:700}
@@ -127,7 +133,7 @@ a.enl:hover{text-decoration:underline}
 .qa-cerrado{font-size:12px;background:#EDEFF2;color:var(--tinta2);border:1px dashed var(--linea);border-radius:6px;padding:7px 10px;font-weight:600}
 .qa-nota-admin{width:100%;font-size:11px;color:var(--alerta);font-weight:600;margin-top:4px}
 .mini-kpis{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-.mk{border:1px solid var(--linea);border-radius:6px;padding:6px 12px;display:flex;flex-direction:column;min-width:86px}
+.mk{border:1px solid var(--linea);border-radius:var(--r-md);padding:8px 14px;box-shadow:0 1px 2px rgba(0,0,0,.04);display:flex;flex-direction:column;min-width:86px}
 .mk b{font-size:17px;line-height:1.1}
 .mk span{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--tinta2);font-weight:700}
 .mk.k-verde b{color:var(--sello)} .mk.k-rojo b{color:var(--rojo)}
@@ -155,7 +161,7 @@ body.compacta .det-grid{gap:4px 16px}
 body.compacta .dato{padding:3px 0}
 .bandeja-cont{display:grid;grid-template-columns:340px 1fr;gap:14px;align-items:start}
 .bandeja-lista{max-height:72vh;overflow-y:auto;padding-right:4px}
-.tarjeta{border:1px solid var(--linea);border-radius:7px;padding:8px 10px;margin-bottom:6px;
+.tarjeta{border:1.5px solid var(--linea);border-radius:var(--r-md);padding:12px 14px;margin-bottom:8px;
   cursor:pointer;background:var(--papel);transition:border-color .12s}
 .tarjeta:hover{border-color:var(--tinta2)}
 .tarjeta.sel{border-color:var(--sello);border-width:2px;background:var(--sello-suave)}
@@ -204,7 +210,7 @@ body.compacta .dato{padding:3px 0}
   main{padding:10px} header .sub{display:none}
 }
 /* ---------- pulido visual ---------- */
-header{background:linear-gradient(135deg,#121C26 0%,#1B2B38 55%,#1E3D33 100%);
+header{background:#0B1120;background-image:linear-gradient(135deg,#0B1120 0%,#122030 40%,#0D2818 100%);
   border-bottom:3px solid var(--sello)}
 header .sello{background:rgba(30,107,67,.25);border-color:#3D8A64;color:#A7D9BE;
   box-shadow:0 0 0 1px rgba(167,217,190,.15)}
